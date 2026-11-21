@@ -6,94 +6,134 @@
 <title>電子採点システム君</title>
 <meta name="description" content="解答用紙を作って印刷し、スキャンした答案を読み込むと自動で採点・集計する、学校の先生向けのアプリです。インストール不要。名簿や答案はパソコンの外に送りません。">
 <style>
-:root{--ink:#1f2328;--sub:#5b6576;--bg:#f6f8fa;--card:#fff;--line:#d5dbe1;--side:#24292f;--accent:#f2c200;--link:#24508a;--warn:#a40e26;--ok:#1a7f37}
+:root{--ink:#1f2328;--sub:#5b6576;--bg:#f4f5f6;--card:#fff;--line:#d5dbe1;--side:#24282d;--side2:#30353b;--rail:#5f6770;--accent:#f5b800;--link:#24508a;--warn:#a40e26}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:"メイリオ",Meiryo,"游ゴシック","Yu Gothic","Hiragino Sans",sans-serif;line-height:1.75;font-size:16px}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"BIZ UDPGothic","BIZ UDPゴシック","メイリオ",Meiryo,"游ゴシック","Yu Gothic","Hiragino Sans",sans-serif;line-height:1.75;font-size:16px}
+::selection{background:rgba(245,184,0,.45);color:var(--ink)}
+:focus-visible{outline:3px solid var(--link);outline-offset:2px}
+header :focus-visible,.end :focus-visible{outline-color:var(--accent)}
+a{color:var(--link);text-underline-offset:.2em}
 header{background:var(--side);color:#fff;border-bottom:6px solid var(--accent)}
 .wrap{max-width:960px;margin:0 auto;padding:0 16px}
-header .wrap{padding-top:24px;padding-bottom:24px}
-h1{margin:0;font-size:30px;letter-spacing:.02em}
-.lead{margin:6px 0 14px;color:#e6eaee;font-size:17px}
-/* 流れ */
-.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 12px;padding:0;list-style:none;counter-reset:f}
-.flow li{background:#2f363d;border:1px solid #444c56;border-radius:6px;padding:8px 10px;font-weight:bold;font-size:15px;line-height:1.4;position:relative;counter-increment:f}
-.flow li::before{content:counter(f);display:inline-block;width:1.5em;height:1.5em;line-height:1.5em;text-align:center;border-radius:50%;background:var(--accent);color:var(--ink);margin-right:6px;font-size:14px}
-.flow li small{display:block;font-weight:normal;color:#b8c0c8;font-size:13px;margin-top:2px}
-.need{margin:0 0 16px;color:#d8dee4;font-size:15px}
+header .wrap{padding-top:26px;padding-bottom:28px}
+h1{margin:0;font-size:30px;letter-spacing:.02em;line-height:1.3}
+.lead{margin:8px 0 18px;color:#e6eaee;font-size:17px;max-width:none}
+/* 流れ: アプリの左の列と同じ「路線」。番号は付けない（番号はアプリの手順の番号だけにする） */
+.route{display:grid;grid-template-columns:repeat(4,1fr);margin:0 0 16px;padding:0;list-style:none;position:relative}
+.route::before{content:"";position:absolute;left:12.5%;right:12.5%;top:9px;height:4px;background:var(--accent);border-radius:2px}
+.route li{position:relative;text-align:center;padding:28px 6px 0;font-weight:bold;font-size:15px;line-height:1.4}
+.route li::before{content:"";position:absolute;left:50%;top:0;width:22px;height:22px;margin-left:-11px;border-radius:50%;background:var(--side);border:4px solid var(--accent)}
+.route li small{display:block;font-weight:normal;color:#b8c0c8;font-size:13px;margin-top:3px}
+.need{margin:0 0 18px;color:#d8dee4;font-size:15px}
 .need b{color:#fff}
 /* スマホの案内 */
-.phone{display:none;background:#fff8d6;color:var(--ink);border-radius:6px;padding:10px 12px;margin:0 0 14px;font-size:15px}
-.phone a{color:var(--link)}
-/* ボタン */
-.starts{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:720px}
-.start{display:block;text-decoration:none;border-radius:8px;padding:14px 16px;color:var(--ink);background:#fff;border:2px solid #fff}
-.start.main{background:var(--accent);border-color:var(--accent)}
-.start:hover{filter:brightness(1.06)}
-.start .t{display:block;font-weight:bold;font-size:20px}
-.start .d{display:block;font-size:14px;color:#3d4450;margin-top:2px;line-height:1.5}
-.start .tag{display:inline-block;background:var(--side);color:#fff;font-size:12px;font-weight:bold;border-radius:10px;padding:0 8px;margin-bottom:4px}
-/* 学校PC */
-.school{background:#2f363d;border:1px solid #444c56;border-left:6px solid var(--ok);border-radius:6px;padding:10px 14px;margin:16px 0 0;max-width:720px}
-.school b.h{display:block;font-size:16px;color:#fff}
-.school ul{margin:2px 0 0;color:#d8dee4;font-size:15px}
-.school a{color:#9cc8ff}
+.phone{display:none;background:#fff8d6;color:var(--ink);border-radius:8px;padding:12px 14px;margin:0 0 4px;font-size:15px}
+.phone b{display:block;font-size:16px}
+.phone .go{display:block;margin-top:10px;text-align:center;font-weight:bold;text-decoration:none;color:var(--ink);background:var(--accent);border-radius:8px;padding:11px 12px}
+/* 入口 */
+.starts{display:flex;flex-wrap:wrap;align-items:stretch;gap:12px}
+.start{display:block;text-decoration:none;border-radius:8px;padding:14px 18px;color:var(--ink);transition:filter .15s ease-out}
+.start.main{background:var(--accent);flex:1 1 380px;max-width:460px}
+.start.sub{border:2px solid var(--rail);color:#fff;flex:0 1 320px}
+.start.main:hover{filter:brightness(1.06)}
+.start.sub:hover{border-color:#c9cfd6;background:var(--side2)}
+.start .t{display:block;font-weight:bold;font-size:21px;line-height:1.4}
+.start .d{display:block;font-size:14px;color:#3d4450;margin-top:4px;line-height:1.55}
+.start.sub .t{font-size:18px}
+.start.sub .d{color:#c9cfd6}
+.start .who{display:block;font-size:13px;font-weight:bold;margin-bottom:2px}
+.start.main .who{color:#3d4450}
+.start.sub .who{color:#c9cfd6}
+.school{margin:18px 0 0;padding:14px 0 0;border-top:1px solid #3d444c;color:#d8dee4;font-size:15px}
+.school b{color:#fff}
+.school p{margin:2px 0}
+.school a{color:#9cc8ff;white-space:nowrap}
 /* 目次 */
 nav.toc{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
 nav.toc .wrap{display:flex;flex-wrap:wrap;gap:6px;padding-top:8px;padding-bottom:8px}
-nav.toc a{text-decoration:none;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:2px 12px;font-size:15px;white-space:nowrap}
+nav.toc a{display:inline-flex;align-items:center;text-decoration:none;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:18px;padding:3px 13px;font-size:15px;white-space:nowrap}
 nav.toc a:hover{border-color:var(--ink)}
-main .wrap{padding-top:20px;padding-bottom:40px}
-section{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px 22px;margin:0 0 18px;scroll-margin-top:60px}
-h2{margin:0 0 10px;font-size:20px;border-left:6px solid var(--accent);padding-left:10px}
-h3{font-size:17px;margin:14px 0 4px}
+main .wrap{padding-top:22px;padding-bottom:28px}
+section{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:22px 24px;margin:0 0 18px;scroll-margin-top:64px}
+h2{margin:0 0 12px;font-size:21px;line-height:1.4;border-left:6px solid var(--accent);padding-left:10px}
+h3{font-size:17px;margin:18px 0 4px;line-height:1.5}
 .small{color:var(--sub);font-size:14px}
 ol,ul{margin:6px 0;padding-left:1.4em}
-li{margin:3px 0}
+li{margin:4px 0}
+p{max-width:46em}
 img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:4px}
 .warn{color:var(--warn);font-weight:bold}
-a{color:var(--link)}
-/* 大事なこと */
-.must{border-left:6px solid var(--warn)}
-.must h2{border-left-color:var(--warn)}
+/* 使う前に */
+.must ol>li{margin:6px 0}
+.must li b{font-weight:bold}
+details{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-weight:bold;color:var(--link);width:max-content;max-width:100%;padding:8px 0}
+details ul{margin-top:8px}
 /* できること */
-.can{display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start}
+.can{display:grid;grid-template-columns:1fr 300px;gap:24px;align-items:start}
 .can figure{margin:0}
 .can figcaption{font-size:14px;color:var(--sub);margin-top:4px}
-/* 動画 */
-.vids{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px;margin-top:8px}
-.vids figure{margin:0}
-.vbox{position:relative}
-.vids video{width:100%;aspect-ratio:16/9;background:#000;border-radius:4px;display:block}
-.vbox .play{position:absolute;right:10px;top:10px;border:0;border-radius:24px;background:rgba(242,194,0,.95);color:var(--ink);font-weight:bold;font-size:15px;padding:6px 14px 6px 12px;cursor:pointer;font-family:inherit}
-.vbox .play::before{content:"";display:inline-block;border-left:11px solid var(--ink);border-top:7px solid transparent;border-bottom:7px solid transparent;margin-right:6px;vertical-align:-1px}
-.vids figcaption{font-weight:bold;margin-top:4px;line-height:1.5}
-.vids figcaption span{font-weight:normal;color:var(--sub);font-size:14px;margin-left:6px}
-.docs li{margin:8px 0}
+/* 動画: 大きい画面1つ＋一覧。1本ずつ流す */
+.player{margin-top:10px}
+.player .now{display:flex;align-items:baseline;gap:10px;margin:0 0 6px;font-weight:bold;font-size:17px}
+.player .now span{font-weight:normal;color:var(--sub);font-size:14px}
+.player video{display:block;width:100%;aspect-ratio:16/9;background:#000;border-radius:6px}
+.playlist{list-style:none;margin:14px 0 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.playlist li{margin:0}
+.playlist button{display:grid;grid-template-columns:112px 1fr;gap:12px;align-items:center;width:100%;min-height:72px;text-align:left;font:inherit;color:var(--ink);background:var(--bg);border:2px solid transparent;border-radius:8px;padding:6px 10px 6px 6px;cursor:pointer}
+.playlist button:hover{border-color:var(--line);background:#eceff2}
+.playlist button[aria-current="true"]{background:#fff8d6;border-color:var(--accent)}
+.playlist img{display:block;width:112px;aspect-ratio:16/9;object-fit:cover;border:0;border-radius:4px}
+.playlist .tt{font-weight:bold;line-height:1.45;font-size:15px}
+.playlist .tt small{display:block;font-weight:normal;color:var(--sub);font-size:13px}
+.vhint{margin:10px 0 0}
+.docs li{margin:10px 0}
 .help ol li{margin:8px 0}
-.dlbtn{display:inline-block;text-decoration:none;font-weight:bold;background:var(--link);color:#fff;padding:12px 22px;border-radius:6px}
-.dlbtn:hover{background:#1e3352}
-footer{color:var(--sub);font-size:14px;text-align:center;padding:0 16px 32px}
+.dlbtn{display:inline-block;text-decoration:none;font-weight:bold;background:var(--side);color:#fff;padding:12px 22px;border-radius:8px}
+.dlbtn:hover{background:#000}
+/* 管理職・情報担当の先生へ */
+.admin dl{margin:8px 0 0;display:grid;grid-template-columns:11em 1fr;gap:0 18px}
+.admin dt{font-weight:bold;padding:12px 0;border-top:1px solid var(--line)}
+.admin dd{margin:0;padding:12px 0;border-top:1px solid var(--line)}
+.admin dd p{margin:0 0 4px}
+.admin code{font-family:Consolas,"BIZ UDGothic",monospace;font-size:14px;background:var(--bg);padding:1px 5px;border-radius:4px}
+/* 終わりの帯 */
+.end{background:var(--side);color:#fff;border-top:6px solid var(--accent)}
+.end .wrap{padding-top:26px;padding-bottom:26px;display:flex;flex-wrap:wrap;align-items:center;gap:14px 24px}
+.end p{margin:0;font-size:18px;font-weight:bold;flex:1 1 300px}
+.end p small{display:block;font-size:14px;font-weight:normal;color:#c9cfd6}
+.end a{display:inline-block;text-decoration:none;font-weight:bold;color:var(--ink);background:var(--accent);border-radius:8px;padding:12px 22px}
+.end a.sp-only{display:none}
+footer{background:var(--side);color:#aab2bb;font-size:14px;text-align:center;padding:0 16px 28px}
 /* 小さい画面 */
 @media (max-width:760px){
- .flow{grid-template-columns:1fr 1fr}
  .can{grid-template-columns:1fr}
  .can figure{max-width:320px}
+ .playlist{grid-template-columns:1fr}
+ .admin dl{grid-template-columns:1fr}
+ .admin dt{padding-bottom:0}
+ .admin dd{border-top:0;padding-top:2px}
 }
 @media (max-width:600px){
  h1{font-size:26px}
  .lead{font-size:16px}
+ .route{grid-template-columns:1fr;gap:0;margin-left:2px}
+ .route::before{left:9px;right:auto;top:11px;bottom:11px;width:4px;height:auto}
+ .route li{text-align:left;padding:0 0 12px 36px}
+ .route li::before{left:0;top:1px;margin-left:0}
+ .route li small{display:inline;margin:0 0 0 6px}
  .phone{display:block}
- .starts{grid-template-columns:1fr}
- .start .t{font-size:18px}
- section{padding:16px 14px}
- .vids{grid-template-columns:1fr 1fr;gap:10px}
- .vids figcaption{font-size:14px}
- .vids figcaption span{display:block;margin-left:0;font-size:13px}
- .vbox .play{right:6px;top:6px;font-size:0;padding:6px 6px 6px 10px}
- .vbox .play::before{margin-right:0}
- nav.toc .wrap{flex-wrap:nowrap;overflow-x:auto;padding-top:6px;padding-bottom:6px}
- nav.toc a{font-size:14px;padding:1px 10px}
+ .starts{display:none}
+ .school{margin-top:14px}
+ section{padding:18px 16px}
+ nav.toc .wrap{flex-wrap:nowrap;overflow-x:auto;padding-top:6px;padding-bottom:6px;-webkit-mask-image:linear-gradient(to right,#000 85%,transparent);mask-image:linear-gradient(to right,#000 85%,transparent)}
+ nav.toc a{min-height:44px;font-size:14px;padding:0 14px;border-radius:22px}
+ nav.toc a:last-child{margin-right:40px}
+ section{scroll-margin-top:68px}
+ .end a.pc-only{display:none}
+ .end a.sp-only{display:inline-block}
 }
 </style>
 </head>
@@ -101,24 +141,21 @@ footer{color:var(--sub);font-size:14px;text-align:center;padding:0 16px 32px}
 <header><div class="wrap">
 <h1>電子採点システム君</h1>
 <p class="lead">マークシートの解答用紙を作って印刷し、答案をスキャンして読み込むと、自動で採点・集計するアプリです。</p>
-<ol class="flow">
+<ol class="route" aria-label="使う流れ">
 <li>解答用紙を作る<small>このアプリで作れます</small></li>
 <li>印刷してテスト<small>ふつうのプリンタで</small></li>
 <li>答案をスキャン<small>コピー機などでPDFに</small></li>
 <li>自動で採点・集計<small>あやしい所は知らせます</small></li>
 </ol>
 <p class="need"><b>要る物</b>: Windows のパソコン、プリンタ、PDFにできるスキャナ（学校のコピー機で大丈夫です）</p>
-<p class="phone">スマホでは採点できません。アプリは<b>パソコン</b>で開いてください。スマホでは<a href="#video">使い方の動画</a>と<a href="#docs">説明書</a>を見られます。</p>
+<p class="phone"><b>スマホでは採点できません。</b>アプリはパソコンで開いてください。スマホでは使い方の動画と説明書を見られます。<a class="go" href="#video">使い方の動画を見る</a></p>
 <div class="starts">
-<a class="start" href="app/%E9%9B%BB%E5%AD%90%E6%8E%A1%E7%82%B9%E3%82%B7%E3%82%B9%E3%83%86%E3%83%A0%E5%90%9B_%E7%B7%B4%E7%BF%92%E3%83%A2%E3%83%BC%E3%83%89.html"><span class="tag">はじめての方はこちら</span><span class="t">練習モードで試す</span><span class="d">見本のテストと答案が入っています。本番のデータとは別なので、自由に触ってかまいません。</span></a>
-<a class="start main" href="app/%E9%9B%BB%E5%AD%90%E6%8E%A1%E7%82%B9%E3%82%B7%E3%82%B9%E3%83%86%E3%83%A0%E5%90%9B.html"><span class="t">アプリを開く</span><span class="d">自分のテストで使うときはこちら。いつも最新の版が開きます。</span></a>
+<a class="start main" href="app/%E9%9B%BB%E5%AD%90%E6%8E%A1%E7%82%B9%E3%82%B7%E3%82%B9%E3%83%86%E3%83%A0%E5%90%9B_%E7%B7%B4%E7%BF%92%E3%83%A2%E3%83%BC%E3%83%89.html"><span class="who">はじめての方は、ここから</span><span class="t">練習モードで試す</span><span class="d">見本のテストと答案が入っています。本番のデータとは別なので、自由に触ってかまいません。</span></a>
+<a class="start sub" href="app/%E9%9B%BB%E5%AD%90%E6%8E%A1%E7%82%B9%E3%82%B7%E3%82%B9%E3%83%86%E3%83%A0%E5%90%9B.html"><span class="who">ふだん使う方</span><span class="t">アプリを開く</span><span class="d">自分のテストで使います。いつも最新の版が開きます（開くまで数秒かかります）。</span></a>
 </div>
 <div class="school">
-<b class="h">学校のパソコンで使えます</b>
-<ul>
-<li>インストールはいりません。ブラウザ（Edge か Chrome）で開くだけです。</li>
-<li>このページやアプリが開けないパソコン、ネットにつながらないパソコンでは → <a href="#zip">ZIP版をダウンロード</a></li>
-</ul>
+<p><b>学校のパソコンで使えます。</b>インストールはいりません。ブラウザ（Edge か Chrome）で開くだけです。</p>
+<p>このページやアプリが開けないパソコン、ネットにつながらないパソコンでは → <a href="#zip">ZIP版をダウンロード</a></p>
 </div>
 </div></header>
 
@@ -129,6 +166,7 @@ footer{color:var(--sub);font-size:14px;text-align:center;padding:0 16px 32px}
 <a href="#docs">説明書</a>
 <a href="#help">困ったとき</a>
 <a href="#zip">ネットが使えないとき</a>
+<a href="#admin">管理職・情報担当の方へ</a>
 </div></nav>
 
 <main><div class="wrap">
@@ -136,11 +174,19 @@ footer{color:var(--sub);font-size:14px;text-align:center;padding:0 16px 32px}
 <section id="must" class="must">
 <h2>使う前に、大事なこと3つ</h2>
 <ol>
-<li class="warn">学校で使うときは、先に管理職・情報担当の先生に確かめてください（名簿や成績を扱うため）。</li>
+<li><b>学校で使うときは、先に管理職・情報担当の先生に確かめてください</b>（名簿や成績を扱うため）。見せる材料は<a href="#admin">「管理職・情報担当の方へ」</a>にまとめました。</li>
 <li>名簿・答案・点数は、使っているパソコンの中だけに保存します。インターネットには送りません。</li>
 <li>読み取り・採点の結果や観点別の評価は、最後に先生が確かめて決めてください。</li>
 </ol>
-<p class="small">ほかの注意（共用のパソコンでの使い方など）は、<a href="#more">このページの下</a>にあります。</p>
+<details>
+<summary>ほかの注意（共用のパソコンなど）</summary>
+<ul>
+<li>対象: 学校の先生（おもに中学校）。</li>
+<li>別のパソコンで続けるときや控えを取るときは、アプリの「ファイルに保存」を使ってください。</li>
+<li>共用のパソコンでは、使い終わったら「その他 ▾」→「このパソコンからデータを全部消す」を押してください。</li>
+<li>このアプリは無保証です。使って起きた損害について、作成者は責任を負いません。</li>
+</ul>
+</details>
 </section>
 
 <section id="can">
@@ -160,16 +206,21 @@ footer{color:var(--sub);font-size:14px;text-align:center;padding:0 16px 32px}
 
 <section id="video">
 <h2>使い方の動画</h2>
-<p class="small">場面ごとの短い動画です（字幕つき・音は BGM だけ）。番号はアプリの左の列の番号と同じです。</p>
-<div class="vids">
-<figure><div class="vbox"><video preload="none" poster="video/1.jpg" src="video/1.mp4"></video><button class="play" type="button" aria-label="再生">再生</button></div><figcaption>名簿を入れる（最初に1回）<span>1分15秒</span></figcaption></figure>
-<figure><div class="vbox"><video preload="none" poster="video/2.jpg" src="video/2.mp4"></video><button class="play" type="button" aria-label="再生">再生</button></div><figcaption>1. 用紙を作って印刷する<span>48秒</span></figcaption></figure>
-<figure><div class="vbox"><video preload="none" poster="video/3.jpg" src="video/3.mp4"></video><button class="play" type="button" aria-label="再生">再生</button></div><figcaption>2. 答案を読み取る<span>59秒</span></figcaption></figure>
-<figure><div class="vbox"><video preload="none" poster="video/4.jpg" src="video/4.mp4"></video><button class="play" type="button" aria-label="再生">再生</button></div><figcaption>3. 要確認を確かめる<span>1分4秒</span></figcaption></figure>
-<figure><div class="vbox"><video preload="none" poster="video/5.jpg" src="video/5.mp4"></video><button class="play" type="button" aria-label="再生">再生</button></div><figcaption>4. 正答と配点を入れる<span>46秒</span></figcaption></figure>
-<figure><div class="vbox"><video preload="none" poster="video/6.jpg" src="video/6.mp4"></video><button class="play" type="button" aria-label="再生">再生</button></div><figcaption>5. 記述を採点する<span>55秒</span></figcaption></figure>
-<figure><div class="vbox"><video preload="none" poster="video/7.jpg" src="video/7.mp4"></video><button class="play" type="button" aria-label="再生">再生</button></div><figcaption>6. 採点表と答案を保存する<span>53秒</span></figcaption></figure>
+<p class="small">場面ごとの短い動画です（字幕つき・音は BGM だけ）。番号はアプリの左の列の番号と同じです。はじめての方は上から順に見てください。終わると次の動画が始まります。</p>
+<div class="player">
+<p class="now" id="vnow">名簿を入れる（最初に1回）<span>1分15秒</span></p>
+<video id="vplayer" controls preload="none" playsinline poster="video/1.jpg" src="video/1.mp4" aria-labelledby="vnow"></video>
 </div>
+<ol class="playlist" id="vlist">
+<li><button type="button" data-n="1" aria-current="true"><img src="video/1.jpg" alt="" width="640" height="360" loading="lazy"><span class="tt">名簿を入れる（最初に1回）<small>1分15秒</small></span></button></li>
+<li><button type="button" data-n="2"><img src="video/2.jpg" alt="" width="640" height="360" loading="lazy"><span class="tt">1. 用紙を作って印刷する<small>48秒</small></span></button></li>
+<li><button type="button" data-n="3"><img src="video/3.jpg" alt="" width="640" height="360" loading="lazy"><span class="tt">2. 答案を読み取る<small>59秒</small></span></button></li>
+<li><button type="button" data-n="4"><img src="video/4.jpg" alt="" width="640" height="360" loading="lazy"><span class="tt">3. 要確認を確かめる<small>1分4秒</small></span></button></li>
+<li><button type="button" data-n="5"><img src="video/5.jpg" alt="" width="640" height="360" loading="lazy"><span class="tt">4. 正答と配点を入れる<small>46秒</small></span></button></li>
+<li><button type="button" data-n="6"><img src="video/6.jpg" alt="" width="640" height="360" loading="lazy"><span class="tt">5. 記述を採点する<small>55秒</small></span></button></li>
+<li><button type="button" data-n="7"><img src="video/7.jpg" alt="" width="640" height="360" loading="lazy"><span class="tt">6. 採点表と答案を保存する<small>53秒</small></span></button></li>
+</ol>
+<p class="small vhint">字幕が小さいときは、動画の右下のボタンで全画面にしてください。スマホは横向きにすると大きく見られます。</p>
 </section>
 
 <section id="docs">
@@ -202,15 +253,23 @@ footer{color:var(--sub);font-size:14px;text-align:center;padding:0 16px 32px}
 <p class="small">ネットが使えるパソコンでダウンロードして、USBメモリなどで移しても使えます。このページから開いたアプリとZIP版のアプリとでは、保存したデータは共有されません。移すときは「ファイルに保存」→「ファイルから読み込む」を使ってください。</p>
 </section>
 
-<section id="more">
-<h2>使う前に（くわしく）</h2>
-<ul>
-<li>対象: 学校の先生（おもに中学校）。</li>
-<li>名簿・答案・点数は、開いたパソコンのブラウザの中だけに保存します。読み取りもパソコンの中でします。</li>
-<li>別のパソコンで続けるときや控えを取るときは、アプリの「ファイルに保存」を使ってください。</li>
-<li>共用のパソコンでは、使い終わったら「その他 ▾」→「このパソコンからデータを全部消す」を押してください。</li>
-<li>このアプリは無保証です。使って起きた損害について、作成者は責任を負いません。</li>
-</ul>
+<section id="admin" class="admin">
+<h2>管理職・情報担当の先生へ</h2>
+<p>使ってよいかを決めるときの材料です。印刷して渡すときは <a href="guide/shunin.pdf">主任・情報担当用の説明書（PDF）</a> も使えます。</p>
+<dl>
+<dt>データの置き場所</dt>
+<dd><p>名簿・答案・点数は、開いたパソコンのブラウザの中だけに保存します。読み取りや採点もパソコンの中でします。データを受け取るサーバーはありません（このページはアプリのファイルを配っているだけです）。</p></dd>
+<dt>外に送らない仕組み</dt>
+<dd><p>アプリのファイルには、ブラウザに通信を禁止させる設定（<code>connect-src 'none'</code>）が入っています。アプリが外へデータを送ろうとしても、ブラウザが止めます。</p>
+<p class="small">確かめ方: ZIP版をネットにつながっていないパソコンで開いても、すべての機能が使えます。</p></dd>
+<dt>AIについて</dt>
+<dd><p>AI（生成AI）は使っていません。マークの濃さを数えて読み取ります。結果は最後に先生が確かめて決めます。</p></dd>
+<dt>版と更新</dt>
+<dd><p>このページから開くと、いつも最新の版になります。学期の途中で動きが変わってほしくないときは、ZIP版を使ってください（落とした版のまま変わりません）。</p>
+<p class="small">いまの版と日付はページのいちばん下にあります。これまでの変更は <a href="https://github.com/Okarin-netizen/denshi-saiten/commits/main">更新の記録（GitHub）</a> で見られます。</p></dd>
+<dt>問い合わせ</dt>
+<dd><p><a href="https://docs.google.com/forms/d/e/1FAIpQLSd4Tc_djY4iIpP_REZZZALOAZJHVkDxrj0N8EwSRyjtVbxeGw/viewform">受付のフォーム</a>から送れます。</p></dd>
+</dl>
 </section>
 
 <section>
@@ -221,14 +280,39 @@ footer{color:var(--sub);font-size:14px;text-align:center;padding:0 16px 32px}
 </section>
 
 </div></main>
+<div class="end"><div class="wrap">
+<p>まずは練習モードで、見本の答案を採点してみてください。<small>本番のデータとは別なので、何を押してもかまいません。</small></p>
+<a class="pc-only" href="app/%E9%9B%BB%E5%AD%90%E6%8E%A1%E7%82%B9%E3%82%B7%E3%82%B9%E3%83%86%E3%83%A0%E5%90%9B_%E7%B7%B4%E7%BF%92%E3%83%A2%E3%83%BC%E3%83%89.html">練習モードで試す</a>
+<a class="sp-only" href="#video">使い方の動画を見る</a>
+</div></div>
 <footer>電子採点システム君　いまの版: ver 2026.11.21.1（2026年11月21日 更新）</footer>
 <script>
-document.querySelectorAll('.vbox').forEach(function(b){
-  var v=b.querySelector('video'),p=b.querySelector('.play');
-  function start(){p.remove();v.controls=true;v.play();}
-  p.addEventListener('click',start);
-  v.addEventListener('click',function(){if(!v.controls)start();});
-});
+(function(){
+  var v=document.getElementById('vplayer'),now=document.getElementById('vnow'),
+      btns=[].slice.call(document.querySelectorAll('#vlist button'));
+  function pick(i,play){
+    var b=btns[i];
+    btns.forEach(function(x){x.removeAttribute('aria-current');});
+    b.setAttribute('aria-current','true');
+    var tt=b.querySelector('.tt');
+    now.innerHTML='';
+    now.appendChild(document.createTextNode(tt.firstChild.textContent));
+    var s=document.createElement('span');s.textContent=tt.querySelector('small').textContent;now.appendChild(s);
+    v.poster='video/'+b.dataset.n+'.jpg';
+    v.src='video/'+b.dataset.n+'.mp4';
+    if(play){v.play();}
+  }
+  btns.forEach(function(b,i){
+    b.addEventListener('click',function(){
+      pick(i,true);
+      if(v.getBoundingClientRect().top<0){v.scrollIntoView({block:'center'});}
+    });
+  });
+  v.addEventListener('ended',function(){
+    var i=btns.findIndex(function(b){return b.getAttribute('aria-current')==='true';});
+    if(i>=0&&i<btns.length-1){pick(i+1,true);}
+  });
+})();
 </script>
 </body>
 </html>

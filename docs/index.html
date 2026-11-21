@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>電子採点システム君</title>
+<meta name="description" content="自作のマークシートをスキャンしたPDFを読み取って、採点・集計する学校の先生向けのアプリです。インストール不要。名簿や答案はパソコンの外に送りません。">
+<style>
+:root{--ink:#1f2328;--sub:#5b6576;--bg:#f6f8fa;--card:#fff;--line:#d5dbe1;--side:#24292f;--accent:#f2c200;--link:#24508a;--warn:#a40e26}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"メイリオ",Meiryo,"游ゴシック","Yu Gothic","Hiragino Sans",sans-serif;line-height:1.75;font-size:16px}
+header{background:var(--side);color:#fff;border-bottom:6px solid var(--accent)}
+.wrap{max-width:960px;margin:0 auto;padding:0 16px}
+header .wrap{padding-top:28px;padding-bottom:28px}
+h1{margin:0;font-size:30px;letter-spacing:.02em}
+.lead{margin:8px 0 18px;color:#d8dee4}
+.btns{display:flex;flex-wrap:wrap;gap:10px}
+.btn{display:inline-block;text-decoration:none;font-weight:bold;font-size:18px;padding:12px 22px;border-radius:6px}
+.btn.main{background:var(--accent);color:#1f2328}
+.btn.main:hover{background:#ffd633}
+.btn.sub{background:transparent;color:#fff;border:2px solid #8b949e}
+.btn.sub:hover{border-color:#fff}
+.btn.dl{background:var(--link);color:#fff;font-size:16px}
+.btn.dl:hover{background:#1e3352}
+header .small{color:#b8c0c8;font-size:14px;margin:12px 0 0}
+main .wrap{padding-top:24px;padding-bottom:40px}
+section{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px 22px;margin:0 0 18px}
+h2{margin:0 0 10px;font-size:20px;border-left:6px solid var(--accent);padding-left:10px}
+.small{color:var(--sub);font-size:14px}
+ol,ul{margin:6px 0;padding-left:1.4em}
+li{margin:3px 0}
+img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:4px}
+.warn{color:var(--warn);font-weight:bold}
+a{color:var(--link)}
+.vids{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px;margin-top:8px}
+.vids figure{margin:0}
+.vids video{width:100%;aspect-ratio:16/9;background:#000;border-radius:4px;display:block}
+.vids figcaption{font-weight:bold;margin-top:4px}
+.vids figcaption span{font-weight:normal;color:var(--sub);font-size:14px;margin-left:6px}
+.docs li{margin:6px 0}
+footer{color:var(--sub);font-size:14px;text-align:center;padding:0 16px 32px}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+<h1>電子採点システム君</h1>
+<p class="lead">自作のマークシートをスキャンしたPDFを読み取って、採点・集計するアプリです。<br>インストール不要。名簿や答案は、パソコンの外には送りません。</p>
+<div class="btns">
+<a class="btn main" href="app/%E9%9B%BB%E5%AD%90%E6%8E%A1%E7%82%B9%E3%82%B7%E3%82%B9%E3%83%86%E3%83%A0%E5%90%9B.html">アプリを開く</a>
+<a class="btn sub" href="app/%E9%9B%BB%E5%AD%90%E6%8E%A1%E7%82%B9%E3%82%B7%E3%82%B9%E3%83%86%E3%83%A0%E5%90%9B_%E7%B7%B4%E7%BF%92%E3%83%A2%E3%83%BC%E3%83%89.html">練習モードで試す</a>
+</div>
+<p class="small">Windows のパソコンの Edge か Chrome で開いてください。いつも最新の版が開きます。</p>
+</div></header>
+<main><div class="wrap">
+
+<section>
+<h2>使う前に（大事）</h2>
+<ul>
+<li>対象: 学校の先生（おもに中学校）。</li>
+<li class="warn">学校で使うときは、先に管理職・情報担当の先生に確かめてください（名簿や成績を扱うため）。</li>
+<li>名簿・答案・点数は、開いたパソコンのブラウザの中だけに保存します。インターネットには送りません。読み取りもパソコンの中でします。</li>
+<li>別のパソコンで続けるときや控えを取るときは、アプリの「ファイルに保存」を使ってください。</li>
+<li>共用のパソコンでは、使い終わったら「その他 ▾」→「このパソコンからデータを全部消す」を押してください。</li>
+<li>読み取り・採点の結果や観点別の評価は、先生が確かめて決めてください。</li>
+<li>このアプリは無保証です。使って起きた損害について、作成者は責任を負いません。</li>
+</ul>
+</section>
+
+<section>
+<h2>使い方の動画</h2>
+<p class="small">場面ごとの短い動画です（字幕つき・音は BGM だけ）。</p>
+<div class="vids">
+<figure><video controls preload="none" poster="video/1.jpg" src="video/1.mp4"></video><figcaption>1. 名簿を入れる<span>1分15秒</span></figcaption></figure>
+<figure><video controls preload="none" poster="video/2.jpg" src="video/2.mp4"></video><figcaption>2. 用紙を作って印刷する<span>48秒</span></figcaption></figure>
+<figure><video controls preload="none" poster="video/3.jpg" src="video/3.mp4"></video><figcaption>3. 答案を読み取る<span>59秒</span></figcaption></figure>
+<figure><video controls preload="none" poster="video/4.jpg" src="video/4.mp4"></video><figcaption>4. 要確認を確かめる<span>1分4秒</span></figcaption></figure>
+<figure><video controls preload="none" poster="video/5.jpg" src="video/5.mp4"></video><figcaption>5. 正答と配点を入れる<span>46秒</span></figcaption></figure>
+<figure><video controls preload="none" poster="video/6.jpg" src="video/6.mp4"></video><figcaption>6. 記述を採点する<span>55秒</span></figcaption></figure>
+<figure><video controls preload="none" poster="video/7.jpg" src="video/7.mp4"></video><figcaption>7. 採点表と答案を保存する<span>53秒</span></figcaption></figure>
+</div>
+</section>
+
+<section>
+<h2>説明書（PDF）</h2>
+<ul class="docs">
+<li><a href="guide/hajime.pdf">はじめの1枚</a> <span class="small">採点の日の流れ（A4 1枚）。印刷して手元に。</span></li>
+<li><a href="guide/qa.pdf">困ったときのQ&amp;A</a> <span class="small">アプリの「困ったときは」でも同じ内容を探せます。</span></li>
+<li><a href="guide/yoshi.pdf">解答用紙の作り方</a> <span class="small">いまの問題用紙に合わせた解答用紙の作り方（A4 1枚）。</span></li>
+<li><a href="guide/shunin.pdf">主任・情報担当用　名簿の設定と配り方</a></li>
+</ul>
+</section>
+
+<section>
+<h2>できること</h2>
+<ul>
+<li><b>用紙を作る</b>: 大問・小問の表の形のマークシート（横書き・国語の縦書き・一問一答・両面）を作って印刷</li>
+<li><b>読み取る</b>: スキャナでPDFにした答案をまとめて読み取り。あやしい所は「要確認」で知らせます</li>
+<li><b>採点する</b>: 正答・配点・観点、完答・順不同、記述問題の採点</li>
+<li><b>まとめる</b>: 採点表（CSV）、返却用の採点済み答案、得点分布・S-P表などの分析</li>
+</ul>
+<p><img src="img/score.png" alt="正答と配点を入れる画面" width="1918" height="900" loading="lazy"></p>
+</section>
+
+<section>
+<h2>インターネットが使えないパソコンでは</h2>
+<p>アプリ・説明書・練習用のデモをまとめた ZIP を落として使えます。</p>
+<p><a class="btn dl" href="download/denshi-saiten.zip">ZIPをダウンロード（約50MB）</a></p>
+<ol>
+<li>落としたZIPを右クリック →「すべて展開」で取り出します。（ZIPの中から直接開くと、うまく保存されません）</li>
+<li>フォルダをドキュメントなど決まった場所に置き、「電子採点システム君.html」をダブルクリックします。</li>
+</ol>
+<p class="small">このページから開いたアプリと、ZIP のアプリとでは、保存したデータは共有されません。移すときは「ファイルに保存」→「ファイルから読み込む」を使ってください。</p>
+</section>
+
+<section>
+<h2>不具合・ご意見</h2>
+<p><a href="https://docs.google.com/forms/d/e/1FAIpQLSd4Tc_djY4iIpP_REZZZALOAZJHVkDxrj0N8EwSRyjtVbxeGw/viewform">受付のフォーム</a>から送ってください。生徒の名前や答案の画像は送らないでください。</p>
+</section>
+
+<section>
+<h2>作成者・ライセンス</h2>
+<p>作成者・著作権者: 技術科　岡田（© 2026）<br>
+ライセンス: <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ja">CC BY-NC-SA 4.0</a>（表示・非営利・継承）</p>
+<p class="small">作成者を表示し、お金を取らずに使うなら、コピーして配ったり直して使ったりできます。直したものを配るときも同じライセンスにしてください。アプリに含まれる pdf.js は Apache License 2.0 です。</p>
+</section>
+
+</div></main>
+<footer>電子採点システム君</footer>
+</body>
+</html>

@@ -1,1 +1,28 @@
-# denshi-saiten
+# 電子採点システム君
+
+自作のマークシートをスキャンした PDF を読み取って、採点・集計する学校の先生向けのアプリです。
+インストール不要。名簿や答案は、パソコンの外には送りません。
+
+## 使う
+
+- **ホームページ（アプリ・使い方の動画・説明書）: https://okarin-netizen.github.io/denshi-saiten/**
+- インターネットが使えないパソコン向け: [ZIP をダウンロード](https://okarin-netizen.github.io/denshi-saiten/download/denshi-saiten.zip)（展開して `電子採点システム君.html` をダブルクリック）
+
+Windows のパソコンの Edge か Chrome で使います。
+
+## 使う前に（大事）
+
+- 対象: 学校の先生（おもに中学校）。
+- 学校で使うときは、先に管理職・情報担当の先生に確かめてください（名簿や成績を扱うため）。
+- 名簿・答案・点数は、そのパソコンのブラウザの中だけに保存します。インターネットには送りません。
+- 読み取り・採点の結果や観点別の評価は、先生が確かめて決めてください。
+- このアプリは無保証です。使って起きた損害について、作成者は責任を負いません。
+
+## 不具合・ご意見
+
+[受付のフォーム](https://docs.google.com/forms/d/e/1FAIpQLSd4Tc_djY4iIpP_REZZZALOAZJHVkDxrj0N8EwSRyjtVbxeGw/viewform) から送ってください。生徒の名前や答案の画像は送らないでください。
+
+## 作成者・ライセンス
+
+- 作成者・著作権者: 技術科　岡田（© 2026）
+- ライセンス: [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ja)（表示・非営利・継承）。アプリに含まれる pdf.js は Apache License 2.0 です。

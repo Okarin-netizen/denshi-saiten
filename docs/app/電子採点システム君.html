@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- 外部との通信をブラウザの仕組みで禁止する（画像・データはこのファイルの中だけで扱う） -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-AbbhyK8EtuaeJRmxxaMtgxo8prOVNBlLB7nC74ZV0E4='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-7Z9hZ0MdQJTHfDlq1R9kSsh+q5iT47cSFCCY5EHNF+I='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
 <title>電子採点システム君</title>
 <style>
 :root {
@@ -3717,6 +3717,77 @@ body.fzl header > button.on:has(> .stn)::after {
 .ck-bot .b {
   white-space: nowrap;
 }
+/* ===== 黒いボタンは1画面に1つ・黄色は2つの意味だけ（2026-11-22 Hallmark の評価 アプリ1・2） =====
+   黒く塗るのは「その画面でいちばん先に押すもの」だけ。
+   - 「次にすること」の帯にボタンがあれば、それが黒。帯の2つ目からのボタンと、同じ画面のほかの黒いボタンは白地に黒い枠
+   - 下の「次へ」はいつも白地に黒い枠（帯や画面の中のボタンが先）
+   - 選んだ ○／×・選んだマーク（状態）は、押すボタンと見分けるため、薄い灰の地に黒い太枠
+   黄色は「次にすること」の帯と、左の列の路線・いまの手順だけに使う。 */
+.nextbar .nxr .b.p ~ .b.p,
+main section.on:has(.nextbar .nxr .b.p) .b.p:not(.nextbar *),
+#tabnav #tn-next {
+  background: #fff !important;
+  color: var(--fg) !important;
+  border-color: var(--fg) !important;
+  box-shadow: inset 0 0 0 1px var(--fg);
+  font-weight: bold;
+}
+.nextbar .nxr .b.p ~ .b.p:hover,
+main section.on:has(.nextbar .nxr .b.p) .b.p:not(.nextbar *):hover:not(:disabled),
+#tabnav #tn-next:hover {
+  background: #eceef0 !important;
+}
+.wg-pts button.on,
+.rv-opts .b.on {
+  background: #dde1e6 !important;
+  color: var(--fg) !important;
+  border-color: var(--fg) !important;
+  box-shadow: inset 0 0 0 2px var(--fg);
+  font-weight: bold;
+}
+/* 選んでいる問・採点だけの画面の切りかえは、ほかの「押してある」ボタンと同じ黒 */
+#wg-qs button.on {
+  background: var(--fg) !important;
+  border-color: var(--fg) !important;
+  color: #fff !important;
+}
+body.wfocus #tab-written .wg-top .seg .b.on {
+  background: #fff !important;
+  border-color: #fff !important;
+  color: var(--fg) !important;
+}
+/* まだ採点していない答案の上の黄色い線はやめる（選んだ ○／× の有無で分かる） */
+.wg-card.todo {
+  box-shadow: none;
+}
+/* 左の列: 黄色は路線と「いまの手順」だけ。残りの数は白、終わった印は緑、「お試し中」は枠だけ */
+.hs-prog b,
+header > button .st.now {
+  color: #fff;
+}
+header > button .tdone,
+header > button.on .tdone {
+  color: #9fe0b8;
+}
+header .tag.trial {
+  background: transparent;
+  color: var(--signtx);
+  border: 1px solid #9aa1aa;
+}
+/* 打っているあいだの名簿の氏名・まとめて配点の帯は、黄色でなく薄い灰 */
+.ck-pv,
+#pt-selbar {
+  background: #f1f3f5;
+  border-color: #b9bfc6;
+}
+/* キーボードの枠: 白い所では黒、左の列（濃い灰）と黄色の帯の上では見える色に */
+:focus-visible {
+  outline-color: var(--fg) !important;
+}
+header :focus-visible,
+body.wfocus #tab-written .wg-top :focus-visible {
+  outline-color: var(--route) !important;
+}
 </style>
 <style id="page-style"></style>
 </head>
@@ -7300,9 +7371,24 @@ function $(s) {
 }
 document.querySelectorAll('header > button').forEach(b => (b.onclick = () => showTab(b.dataset.tab)));
 // --- 版（バージョン）と更新履歴。番号は 年.月.日.その日の何回目か（10/06 以前は1日分をまとめて1つ）
-const APP_VER = '2026.11.22.1',
+const APP_VER = '2026.11.22.3',
   APP_DATE = '2026年11月22日';
 const HISTORY = [
+  [
+    '2026.11.22.3',
+    '11月22日',
+    [
+      '黒く塗ったボタンを、その画面でいちばん先に押すもの1つだけにしました。下の「次へ」は白地に黒い枠です。記述の採点で選んだ ○／× は、押すボタンと見分けやすいよう薄い灰の地に太い枠にしました。',
+      '黄色は「次にすること」の帯と、左の列の路線・いまの手順だけに使うようにしました（残りの数・終わった印・お試し中の札・採点していない答案の線は黄色をやめました）。'
+    ]
+  ],
+  [
+    '2026.11.22.2',
+    '11月22日',
+    [
+      '左の列のタブを押したあと、End・Home・PageDown・PageUp・↑↓ キーでページが動かないことがあったのを直しました（Windows の 1366×768 の画面など）。'
+    ]
+  ],
   [
     '2026.11.22.1',
     '11月22日',
@@ -8584,6 +8670,19 @@ document.addEventListener('click', ev => {
   if (!b) return;
   showTab(b.dataset.gotab);
   window.scrollTo(0, 0);
+});
+// 左の列のタブを押したあとの End・Home・PageDown・PageUp・↑↓ は、ページを動かす。
+// 左の列は中身が入りきらないときだけ縦に動く（overflow: auto）。Windows の字では 1366×768 で中身が 1px はみ出し、
+// キーが左の列の方を 1px 動かすだけで、ページが動かなかった（2026-11-22 カピバラwin で見つけた）
+const PAGE_KEYS = { End: 'end', Home: 'home', PageDown: 1, PageUp: -1, ArrowDown: 40, ArrowUp: -40 };
+document.querySelector('header').addEventListener('keydown', ev => {
+  const k = PAGE_KEYS[ev.key];
+  if (k == null || ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey) return;
+  if (ev.target.closest('input,select,textarea,[contenteditable],#ts-more[open]')) return;
+  ev.preventDefault();
+  if (k === 'end') window.scrollTo(0, document.documentElement.scrollHeight);
+  else if (k === 'home') window.scrollTo(0, 0);
+  else window.scrollBy(0, Math.abs(k) === 1 ? k * innerHeight * 0.85 : k);
 });
 // --- 用紙作成
 // o: 作り直す途中の構成（st: マークの行・wn: 記述の問の数）。ないときはいまのテストのもの。記述欄の高さ「自動」は、いまの高さを最小にして余白いっぱいに伸ばす

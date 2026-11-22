@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- 外部との通信をブラウザの仕組みで禁止する（画像・データはこのファイルの中だけで扱う） -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-u9D0QZImHDdjInEllFY0/dxdx2tQD5Aw2HmHLU4DDKY=' 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-AbbhyK8EtuaeJRmxxaMtgxo8prOVNBlLB7nC74ZV0E4=' 'sha256-MA3y2oFyWswFJjZAMxiHN3vVK6uXWif0S6jKN0xDBHE='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-u9D0QZImHDdjInEllFY0/dxdx2tQD5Aw2HmHLU4DDKY=' 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-6E+TMPNSXhmB/d5VbFdrIHwBFUUtbFnrfYa3BOkAhdg=' 'sha256-MA3y2oFyWswFJjZAMxiHN3vVK6uXWif0S6jKN0xDBHE='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
 <title>電子採点システム君</title>
 <style>
 :root {
@@ -7313,9 +7313,16 @@ function $(s) {
 }
 document.querySelectorAll('header > button').forEach(b => (b.onclick = () => showTab(b.dataset.tab)));
 // --- 版（バージョン）と更新履歴。番号は 年.月.日.その日の何回目か（10/06 以前は1日分をまとめて1つ）
-const APP_VER = '2026.11.22.1',
+const APP_VER = '2026.11.22.2',
   APP_DATE = '2026年11月22日';
 const HISTORY = [
+  [
+    '2026.11.22.2',
+    '11月22日',
+    [
+      '左の列のタブを押したあと、End・Home・PageDown・PageUp・↑↓ キーでページが動かないことがあったのを直しました（Windows の 1366×768 の画面など）。'
+    ]
+  ],
   [
     '2026.11.22.1',
     '11月22日',
@@ -8597,6 +8604,19 @@ document.addEventListener('click', ev => {
   if (!b) return;
   showTab(b.dataset.gotab);
   window.scrollTo(0, 0);
+});
+// 左の列のタブを押したあとの End・Home・PageDown・PageUp・↑↓ は、ページを動かす。
+// 左の列は中身が入りきらないときだけ縦に動く（overflow: auto）。Windows の字では 1366×768 で中身が 1px はみ出し、
+// キーが左の列の方を 1px 動かすだけで、ページが動かなかった（2026-11-22 カピバラwin で見つけた）
+const PAGE_KEYS = { End: 'end', Home: 'home', PageDown: 1, PageUp: -1, ArrowDown: 40, ArrowUp: -40 };
+document.querySelector('header').addEventListener('keydown', ev => {
+  const k = PAGE_KEYS[ev.key];
+  if (k == null || ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey) return;
+  if (ev.target.closest('input,select,textarea,[contenteditable],#ts-more[open]')) return;
+  ev.preventDefault();
+  if (k === 'end') window.scrollTo(0, document.documentElement.scrollHeight);
+  else if (k === 'home') window.scrollTo(0, 0);
+  else window.scrollBy(0, Math.abs(k) === 1 ? k * innerHeight * 0.85 : k);
 });
 // --- 用紙作成
 // o: 作り直す途中の構成（st: マークの行・wn: 記述の問の数）。ないときはいまのテストのもの。記述欄の高さ「自動」は、いまの高さを最小にして余白いっぱいに伸ばす

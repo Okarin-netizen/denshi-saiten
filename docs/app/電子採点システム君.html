@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- 外部との通信をブラウザの仕組みで禁止する（画像・データはこのファイルの中だけで扱う） -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-aPJ+0+OcFCeV6c3ATd9w8NEgqBnRC1NdQpiyrJlGrgk='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-r3Bu/V4o106Ea4Wwr46hvm9SPfGL1UsAfwmbKdGrOTk='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
 <title>電子採点システム君</title>
 <style>
 :root {
@@ -7371,9 +7371,16 @@ function $(s) {
 }
 document.querySelectorAll('header > button').forEach(b => (b.onclick = () => showTab(b.dataset.tab)));
 // --- 版（バージョン）と更新履歴。番号は 年.月.日.その日の何回目か（10/06 以前は1日分をまとめて1つ）
-const APP_VER = '2026.11.23.1',
+const APP_VER = '2026.11.23.2',
   APP_DATE = '2026年11月23日';
 const HISTORY = [
+  [
+    '2026.11.23.2',
+    '11月23日',
+    [
+      '年度が替わって（4月）前の年度の名簿が残っているときは、左の「名簿」に「年度が替わりました」と出し、「名簿」タブから前の名簿を消せるようにしました。続けて使うときは「このまま使う」を押します。'
+    ]
+  ],
   [
     '2026.11.23.1',
     '11月23日',
@@ -10973,6 +10980,31 @@ const kanaKey = v =>
 const RD = { noros: false, busy: false }; // 名簿なしで試しに読み取る（このときだけ）
 function saveSR() {
   lsSet('msroster', JSON.stringify(SR));
+  // 名簿を入れた年度。空にしたら忘れる。初めて入れたときだけ今の年度にする（転入生を足しても変えない）
+  try {
+    if (!SR.length) localStorage.removeItem('msrosyr');
+    else if (!localStorage.getItem('msrosyr')) rosYrNow();
+  } catch (e) {}
+}
+// 年度（4月はじまり）。2027年3月は 2026年度
+const fyOf = d => d.getFullYear() - (d.getMonth() < 3 ? 1 : 0);
+// 名簿を今の年度のものにする（新しい名簿を入れたとき・「このまま使う」を押したとき）
+function rosYrNow() {
+  lsSet('msrosyr', String(fyOf(new Date())));
+}
+// 年度が替わっても前の年度の名簿が残っていたら、その年度を返す（なければ 0）。
+// 4月に開いたとき、名簿を消すよう声をかける（2026-11-23 おかだ決定、要求の一覧 SAI-07: 名簿は年度末まで）
+function rosOld() {
+  if (!SR.length) return 0;
+  let y = 0;
+  try {
+    y = +localStorage.getItem('msrosyr') || 0;
+  } catch (e) {}
+  if (!y) {
+    rosYrNow(); // この版より前に入れた名簿は、いつ入れたか分からないので今の年度として数え始める
+    return 0;
+  }
+  return y < fyOf(new Date()) ? y : 0;
 }
 // 転出した生徒（2026-10-09 おかだ「転出生徒も名簿で分かるように」）。学籍番号と氏名の組で覚える（名簿を入れ直しても残り、同じ番号の別の生徒には付かない）。値は転出にした日
 let MV = {};
@@ -11231,7 +11263,8 @@ function renderNext() {
     bs.forEach(b => {
       b.remove();
       b.classList.remove('lk');
-      b.classList.add('p');
+      // 消すボタンと data-plain のボタンは黒くしない（黒いボタンは1画面に1つ）
+      if (!b.classList.contains('del') && !b.hasAttribute('data-plain')) b.classList.add('p');
     });
     e.innerHTML = d.innerHTML;
     r.querySelectorAll('button').forEach(b => b.remove());
@@ -11371,21 +11404,25 @@ function renderNext() {
     ck = '<span class="tdone" title="終わりました">✓</span>';
   {
     const rn = rosterRows().length,
-      sp = spPend();
+      sp = spPend(),
+      old = rosOld();
     tb(
       'roster',
       '名簿',
-      rn && !sp
+      rn && !sp && !old
         ? '<span class="tdone" title="名簿が入っています">✓</span>'
-        : `<span class="badge" title="${rn ? '特別支援学級の生徒の交流学級がまだです' : '名簿がまだです'}">!</span>`
+        : `<span class="badge" title="${old ? `年度が替わりました。名簿は${old}年度のものです` : rn ? '特別支援学級の生徒の交流学級がまだです' : '名簿がまだです'}">!</span>`
     );
     set(
       'roster',
-      !rn
-        ? '名簿のファイル（スズキ校務から書き出した CSV、主任・情報担当から配られた名簿、または「名簿のひな形（Excel）」に入力したファイル）を入れます。'
-        : sp
-          ? `特別支援学級の ${sp}人の交流学級を、下の表で選びます。`
-          : `名簿は入っています（${rn}人）。転入生は「1人足す（転入）」で足せます。` + nx('make')
+      old
+        ? `<b>年度が替わりました。</b>このパソコンの名簿は ${old}年度に入れたものです。新しい年度の名簿を入れる前に、前の名簿を消します。` +
+            ' <button class="b" data-act="rosoldDel">前の名簿を消す</button> <button class="b" data-plain data-act="rosoldKeep">このまま使う</button>'
+        : !rn
+          ? '名簿のファイル（スズキ校務から書き出した CSV、主任・情報担当から配られた名簿、または「名簿のひな形（Excel）」に入力したファイル）を入れます。'
+          : sp
+            ? `特別支援学級の ${sp}人の交流学級を、下の表で選びます。`
+            : `名簿は入っています（${rn}人）。転入生は「1人足す（転入）」で足せます。` + nx('make')
     );
   }
   tb('read', '2. 読み取り', ok.length ? ck : '');
@@ -11434,7 +11471,13 @@ function sideStatus(need0) {
     printed = !!(t.prdone || (t.printed && t.printed.length)),
     keyOk = !noKey && !wDef && (p.n > 0 || p.wn > 0),
     m = {
-      roster: !rn ? ['名簿がまだ', 'todo'] : sp ? [`交流学級を選ぶ（${sp}人）`, 'todo'] : [`${rn}人 登録ずみ`, ''],
+      roster: !rn
+        ? ['名簿がまだ', 'todo']
+        : rosOld()
+          ? ['年度が替わりました', 'todo']
+          : sp
+            ? [`交流学級を選ぶ（${sp}人）`, 'todo']
+            : [`${rn}人 登録ずみ`, ''],
       make: printed ? ['印刷ずみ', ''] : ['', ''],
       read: ok.length ? [`${ok.length}枚 読み取りずみ`, ''] : ['', ''],
       review: !ok.length ? ['', ''] : need ? [`あと${need}枚 確かめる`, 'todo'] : ['確認ずみ', ''],
@@ -17178,6 +17221,7 @@ async function importRosterFile(f, msgEl, toOwn) {
     return false;
   }
   saveRR();
+  if (!own) rosYrNow(); // 新しく入れた名簿は今の年度のもの
   if (RR) {
     if (own) t.roster = [];
     else SR = [];
@@ -18180,6 +18224,14 @@ $('#ro-addbox').addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
     e.preventDefault();
     $('#ro-ago').click();
+  }
+});
+// 年度が替わったときの帯のボタン（rosOld）: 消すのはいつもの「名簿をすべて消す」と同じ（確かめてから消す）
+document.addEventListener('click', ev => {
+  if (ev.target.closest('[data-act=rosoldDel]')) $('#ro-clear').click();
+  else if (ev.target.closest('[data-act=rosoldKeep]')) {
+    rosYrNow();
+    renderNext();
   }
 });
 $('#ro-clear').onclick = () => {

@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- 外部との通信をブラウザの仕組みで禁止する（画像・データはこのファイルの中だけで扱う） -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-u9D0QZImHDdjInEllFY0/dxdx2tQD5Aw2HmHLU4DDKY=' 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-7Z9hZ0MdQJTHfDlq1R9kSsh+q5iT47cSFCCY5EHNF+I=' 'sha256-MA3y2oFyWswFJjZAMxiHN3vVK6uXWif0S6jKN0xDBHE='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-u9D0QZImHDdjInEllFY0/dxdx2tQD5Aw2HmHLU4DDKY=' 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-aPJ+0+OcFCeV6c3ATd9w8NEgqBnRC1NdQpiyrJlGrgk=' 'sha256-MA3y2oFyWswFJjZAMxiHN3vVK6uXWif0S6jKN0xDBHE='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
 <title>電子採点システム君</title>
 <style>
 :root {
@@ -7384,9 +7384,16 @@ function $(s) {
 }
 document.querySelectorAll('header > button').forEach(b => (b.onclick = () => showTab(b.dataset.tab)));
 // --- 版（バージョン）と更新履歴。番号は 年.月.日.その日の何回目か（10/06 以前は1日分をまとめて1つ）
-const APP_VER = '2026.11.22.3',
-  APP_DATE = '2026年11月22日';
+const APP_VER = '2026.11.23.1',
+  APP_DATE = '2026年11月23日';
 const HISTORY = [
+  [
+    '2026.11.23.1',
+    '11月23日',
+    [
+      '答案を読み取ったあとに「1. 用紙を作る」で問題の数や用紙の大きさなどを変えると、「6. 採点結果」に、ずれた点の採点表が出ることがあったのを直しました。読み取った答案があるテストの用紙の形を変えるときは、先に確かめるようにしました（「キャンセル」で前のままにします）。'
+    ]
+  ],
   [
     '2026.11.22.3',
     '11月22日',
@@ -9705,6 +9712,11 @@ function qApply(t, gs, msg) {
       } catch (e) {}
     lay = { ...t.layouts, [p.wver]: nbx.filter(Boolean) };
   }
+  if (!shapeOk(t, p)) {
+    const b = $('#mk-struct');
+    if (b.dataset.tid === t.id && b.dataset.gen != null) $('#ms-gen').value = b.dataset.gen;
+    throw new Error('変えるのをやめました');
+  }
   if (pkey(p) !== pkey(op)) delete t.prdone;
   Object.assign(t, { struct: st, wlabels: lb, params: p, arr, pts, cat, cg, wmodel, wstyle, layouts: lay });
   t.wk = { n: p.n, keys: wKeys(t, p) };
@@ -10709,7 +10721,10 @@ function mkInput(ev) {
     try {
       const p = mkParams();
       chkLayout(t, p);
-      if (pkey(p) !== pkey(t.params)) {
+      if (pkey(p) !== pkey(t.params) && !shapeOk(t, p)) {
+        mkFields(t);
+        $('#mk-msg').textContent = '読み取った答案があるので、用紙の設定は前のままにしました。';
+      } else if (pkey(p) !== pkey(t.params)) {
         if (p.vert !== (t.params.vert | 0) && p.wn) {
           t.wstyle = wStyles(t, t.params).map(x => ({ ...x, k: p.vert ? (x.k <= 1 ? 2 : x.k) : x.k === 2 ? 1 : x.k }));
         } // 縦書きにしたらマス目も縦書きに
@@ -11069,6 +11084,24 @@ function stripTest(t) {
 }
 function curTest() {
   return TS.list.find(t => t.id === TS.cur) || null;
+}
+// テストの読み取った答案のうち、いまの用紙の形（pkey）で読んだものの数（正解用紙も数える）
+function readCount(t) {
+  const sh = t.id === S.owner ? S.sheets : (S.store.get(t.id) || {}).sheets || [],
+    k = pkey(t.params);
+  return sh.filter(s => !s.error && pkey(s.p) === k).length;
+}
+// 用紙の形（問題の数・選択肢の数・用紙の大きさなど）を p に変えてよいか。読み取った答案があるときだけ先に聞く
+// （聞かずに変えていたため、読み取った答案と形が合わなくなり、採点できなくなっていた。2026-11-23 デバッグ）
+function shapeOk(t, p) {
+  if (!t || pkey(p) === pkey(t.params)) return true;
+  const n = readCount(t);
+  return (
+    !n ||
+    confirm(
+      `このテストには、読み取った答案が ${n} 枚あります。\n用紙の形（問題の数・選択肢の数・用紙の大きさなど）を変えると、読み取った答案と合わなくなり、採点できなくなります。\n\n変えますか？（「キャンセル」で前のままにします）`
+    )
+  );
 }
 function saveTests() {
   const t = curTest();
@@ -11851,19 +11884,9 @@ function renderTestBar() {
       }, 8000);
   }).observe(e, { childList: true, characterData: true, subtree: true });
 }
-function loadTestToUI() {
-  const t = curTest(),
-    p = t.params;
-  MKS.ver++;
-  $('#mk-title').value = t.name;
-  $('#gp-g').value = (t.grp && t.grp.g) || 0;
-  $('#gp-c').value = (t.grp && t.grp.c) || 0;
-  $('#gp-x').value = (t.grp && t.grp.x) || 0;
-  $('#gp-k').value = t.grp && t.grp.k === 0 ? 0 : 1;
-  $('#abc-a').value = (t.abc && t.abc.a) || 80;
-  $('#abc-c').value = t.abc && t.abc.c != null ? t.abc.c : 50;
-  scSetSum();
-  $('#mk-msg').textContent = '';
+// 「1. 用紙を作る」の用紙の設定の欄を、テスト t の設定にする
+function mkFields(t) {
+  const p = t.params;
   [
     ['#mk-dup', 'duplex'],
     ['#mk-dg', 'digits'],
@@ -11874,6 +11897,20 @@ function loadTestToUI() {
     ['#mk-wf', 'wfree']
   ].forEach(([s, k]) => ($(s).value = p[k]));
   $('#mk-wh').value = t.wfill === 0 && !p.wfree ? String(p.wh) : 'a';
+}
+function loadTestToUI() {
+  const t = curTest();
+  MKS.ver++;
+  $('#mk-title').value = t.name;
+  $('#gp-g').value = (t.grp && t.grp.g) || 0;
+  $('#gp-c').value = (t.grp && t.grp.c) || 0;
+  $('#gp-x').value = (t.grp && t.grp.x) || 0;
+  $('#gp-k').value = t.grp && t.grp.k === 0 ? 0 : 1;
+  $('#abc-a').value = (t.abc && t.abc.a) || 80;
+  $('#abc-c').value = t.abc && t.abc.c != null ? t.abc.c : 50;
+  scSetSum();
+  $('#mk-msg').textContent = '';
+  mkFields(t);
   MKS.og = new Set();
   mkUpdate();
   renderTestBar();
@@ -14537,6 +14574,11 @@ function kvWsum() {
           .join('、')}`
       : '');
 }
+// S.key（正答・配点を入れているテスト）が、いまのテストで、用紙 p と同じ形か。形は前に覚えた値でなく、いまの設定で比べる
+// （「1. 用紙を作る」で問題の数などを変えたあとも古い形のまま採点し、点がずれていた。2026-11-23 デバッグ）
+function keyFits(p) {
+  return !!(S.key && S.key === curTest() && pkey(S.key.params) === pkey(p));
+}
 function keyParams() {
   const p = sheetsP();
   if (p) return p;
@@ -14567,7 +14609,7 @@ function keyEditor() {
     t = curTest();
   if (pkey(t.params) !== code) {
     S.key = null;
-    w.innerHTML = `<p class="err">読み取った用紙（${esc(pdesc(p))}・学籍番号${p.digits}桁）と、選択中のテスト「${esc(t.name)}」（${esc(pdesc(t.params))}・学籍番号${t.params.digits}桁）の種類が違います。左上の「いまのテスト」で合うものを選んでください。</p>`;
+    w.innerHTML = `<p class="err">読み取った用紙（${esc(pdesc(p))}・学籍番号${p.digits}桁）と、選択中のテスト「${esc(t.name)}」（${esc(pdesc(t.params))}・学籍番号${t.params.digits}桁）の種類が違います。左上の「いまのテスト」で合うものを選んでください（「1. 用紙を作る」で問題の数などを変えたときは、前と同じ形に戻すと採点できます）。</p>`;
     $('#pt-table').innerHTML = '';
     $('#kv-info').textContent = '';
     $('#kv-kind').textContent = '';
@@ -14577,8 +14619,6 @@ function keyEditor() {
     S.key = t;
     PT.sel = new Set();
   }
-  t.p = t.params;
-  t.code = code;
   const L = computeLayout(withG(t, p)),
     rows = rowSpec(p, t),
     F = SVG_FONT,
@@ -14642,7 +14682,7 @@ function kvFromText() {
   err.textContent = '';
   if (!S.key || !$('#sc-key').value.trim()) return;
   try {
-    const p = S.key.p;
+    const p = S.key.params;
     S.key.arr = parseKey($('#sc-key').value, p.n, p.choices, p.labels, rowSpec(p, S.key));
     keySave();
     keyEditor();
@@ -14668,8 +14708,8 @@ function autoKey() {
   if (!t || !t.params.n || keyEmpty(t) < keyRows(t)) return false;
   const ks = S.sheets.filter(s => !s.error && isKey(s));
   if (ks.length !== 1 || issueCount(ks[0])) return false;
-  if (!(S.key === t && S.key.code === pkey(ks[0].p))) keyEditor();
-  if (S.key !== t || S.key.code !== pkey(ks[0].p)) return false;
+  if (!keyFits(ks[0].p)) keyEditor();
+  if (!keyFits(ks[0].p)) return false;
   $('#kv-fromsheet').click();
   return keyEmpty(t) < keyRows(t);
 }
@@ -14686,12 +14726,12 @@ $('#kv-fromsheet').onclick = () => {
     err.textContent = '正解用紙に要確認があります。先に確認タブで確認してください';
     return;
   }
-  if (pkey(ks[0].p) !== S.key.code) {
+  if (pkey(ks[0].p) !== pkey(S.key.params)) {
     err.textContent = '正解用紙の種類が違います';
     return;
   }
   const k = ks[0].qs.map(answerOf),
-    rows = rowSpec(S.key.p, S.key);
+    rows = rowSpec(S.key.params, S.key);
   S.key.arr = k.map(a => (a >= 0 ? a : -1));
   keySave();
   keyEditor();
@@ -15450,8 +15490,11 @@ function score() {
   const p = valid[0].p;
   if (valid.some(s => pkey(s.p) !== pkey(p))) throw new Error('種類の違う用紙が混ざっています');
   const unresolved = S.sheets.filter(s => issueCount(s)).length;
-  if (!(S.key && S.key === curTest() && S.key.code === pkey(p))) keyEditor();
-  if (!S.key) throw new Error('読み取った用紙と選択中のテストの種類が違います');
+  if (!keyFits(p)) keyEditor();
+  if (!keyFits(p))
+    throw new Error(
+      '読み取った用紙と、選択中のテストの用紙の形（問題の数・選択肢の数など）が違います。くわしくは「4. 正答・配点」を開いてください。'
+    );
   const key = S.key.arr.slice(),
     n = p.n,
     wn = p.wn;

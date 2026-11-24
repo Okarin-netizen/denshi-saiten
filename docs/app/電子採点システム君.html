@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- 外部との通信をブラウザの仕組みで禁止する（画像・データはこのファイルの中だけで扱う） -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-r3Bu/V4o106Ea4Wwr46hvm9SPfGL1UsAfwmbKdGrOTk='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-+LMa2kS39Q17NVILWfZ86s+wNOvJmA9b48kpEmnkfzo='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
 <title>電子採点システム君</title>
 <style>
 :root {
@@ -7371,9 +7371,16 @@ function $(s) {
 }
 document.querySelectorAll('header > button').forEach(b => (b.onclick = () => showTab(b.dataset.tab)));
 // --- 版（バージョン）と更新履歴。番号は 年.月.日.その日の何回目か（10/06 以前は1日分をまとめて1つ）
-const APP_VER = '2026.11.23.2',
-  APP_DATE = '2026年11月23日';
+const APP_VER = '2026.11.24.1',
+  APP_DATE = '2026年11月24日';
 const HISTORY = [
+  [
+    '2026.11.24.1',
+    '11月24日',
+    [
+      '採点済みの答案のPDFを Edge や Chrome で印刷すると、プリンタに送るデータが1ページ100MBをこえるほど大きくなっていたのを直しました。答案の灰色と赤の書き込みを1枚の画像にまとめ、1ページ約2MBになります（見た目は同じです）。'
+    ]
+  ],
   [
     '2026.11.23.2',
     '11月23日',
@@ -18605,33 +18612,38 @@ async function deflate(u) {
   const s = new Blob([u]).stream().pipeThrough(new CompressionStream('deflate'));
   return new Uint8Array(await new Response(s).arrayBuffer());
 }
-// ページの画像を2枚に分ける: 灰色の答案（16段階・可逆圧縮）と、赤の書き込みの形（1ビット）。
-// 1枚のカラー写真より、PDF も印刷機に送るデータもずっと小さい。赤は色のある所（灰色にした答案にはない）
-const RED_PDF = '0.89 0.08 0.08';
-async function splitInk(cv) {
+// ページを1枚の画像にする: 灰色15段の答案と赤1色を、16色の色番号（4ビット・可逆圧縮）で持つ。
+// 赤を「形だけの層（ImageMask）」で重ねると、Edge・Chrome の印刷ではページ全体が非圧縮の大きな画像に
+// 描き直され、1ページ100MBをこえる（2026-11-24 カピバラwin で測った）。1枚の画像なら印刷でもふくらまない
+const INK_RGB = [227, 20, 20],
+  OV_PAL = (() => {
+    let h = '';
+    for (let v = 0; v < 15; v++)
+      h += Math.round((v * 255) / 14)
+        .toString(16)
+        .padStart(2, '0')
+        .repeat(3);
+    return h + INK_RGB.map(c => c.toString(16).padStart(2, '0')).join('');
+  })();
+async function packPage(cv) {
   const W = cv.width,
     H = cv.height,
     d = cv.getContext('2d').getImageData(0, 0, W, H).data,
     rb = (W + 1) >> 1,
-    mb = (W + 7) >> 3,
-    g = new Uint8Array(rb * H),
-    m = new Uint8Array(mb * H).fill(255);
-  let ink = false;
+    g = new Uint8Array(rb * H);
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       const i = (y * W + x) * 4,
         r = d[i],
         gg = d[i + 1],
-        b = d[i + 2];
-      let v;
-      if (Math.max(r, gg, b) - Math.min(r, gg, b) > 60) {
-        m[y * mb + (x >> 3)] &= ~(128 >> (x & 7)); // 0 の所に赤を塗る
-        ink = true;
-        v = 15;
-      } else v = Math.round((0.299 * r + 0.587 * gg + 0.114 * b) / 17);
+        b = d[i + 2],
+        v =
+          Math.max(r, gg, b) - Math.min(r, gg, b) > 60
+            ? 15 // 色のある所（灰色にした答案にはない）は赤
+            : Math.round(((0.299 * r + 0.587 * gg + 0.114 * b) * 14) / 255);
       g[y * rb + (x >> 1)] |= x & 1 ? v : v << 4;
     }
-  return { gray: await deflate(g), mask: ink ? await deflate(m) : null };
+  return { idx: await deflate(g) };
 }
 function canvasJpeg(cv) {
   return new Promise((res, rej) =>
@@ -18661,14 +18673,14 @@ function buildPdf(pages) {
   add('%PDF-1.4\n%âãÏÓ\n');
   obj(1, () => add('<< /Type /Catalog /Pages 2 0 R >>'));
   obj(2, () =>
-    add(`<< /Type /Pages /Kids [${pages.map((_, i) => `${3 + 4 * i} 0 R`).join(' ')}] /Count ${pages.length} >>`)
+    add(`<< /Type /Pages /Kids [${pages.map((_, i) => `${3 + 3 * i} 0 R`).join(' ')}] /Count ${pages.length} >>`)
   );
-  // 1ページに4つ: ページ・描き方・答案の画像・赤の形（ないときは null）
+  // 1ページに3つ: ページ・描き方・答案の画像
   pages.forEach((p, i) => {
-    const a = 3 + 4 * i,
+    const a = 3 + 3 * i,
       pw = p.pw.toFixed(2),
       ph = p.ph.toFixed(2),
-      cs = `q ${pw} 0 0 ${ph} 0 0 cm /Im0 Do${p.mask ? ` ${RED_PDF} rg /Im1 Do` : ''} Q`,
+      cs = `q ${pw} 0 0 ${ph} 0 0 cm /Im0 Do Q`,
       img = (n, dict, data) =>
         obj(n, () => {
           add(
@@ -18679,16 +18691,14 @@ function buildPdf(pages) {
         });
     obj(a, () =>
       add(
-        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pw} ${ph}] /Resources << /XObject << /Im0 ${a + 2} 0 R${p.mask ? ` /Im1 ${a + 3} 0 R` : ''} >> >> /Contents ${a + 1} 0 R >>`
+        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pw} ${ph}] /Resources << /XObject << /Im0 ${a + 2} 0 R >> >> /Contents ${a + 1} 0 R >>`
       )
     );
     obj(a + 1, () => add(`<< /Length ${cs.length} >>\nstream\n${cs}\nendstream`));
     if (p.jpg) img(a + 2, '/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode', p.jpg);
-    else img(a + 2, '/ColorSpace /DeviceGray /BitsPerComponent 4 /Filter /FlateDecode', p.gray);
-    if (p.mask) img(a + 3, '/ImageMask true /BitsPerComponent 1 /Filter /FlateDecode', p.mask);
-    else obj(a + 3, () => add('null'));
+    else img(a + 2, `/ColorSpace [/Indexed /DeviceRGB 15 <${OV_PAL}>] /BitsPerComponent 4 /Filter /FlateDecode`, p.idx);
   });
-  const n = 3 + 4 * pages.length,
+  const n = 3 + 3 * pages.length,
     xref = pos;
   add(
     `xref\n0 ${n}\n0000000000 65535 f \n` +
@@ -18863,10 +18873,10 @@ async function ovPages(jobs, sc, o, msg, prog) {
     }
   return { pages, low };
 }
-// PDF の1ページ（灰色の答案と赤の形、古いブラウザでは JPEG にした画像。紙の大きさ pt）
+// PDF の1ページ（灰色と赤の16色の画像、古いブラウザでは JPEG にした画像。紙の大きさ pt）
 async function pageOf(cv) {
   return {
-    ...(window.CompressionStream ? await splitInk(cv) : { jpg: await canvasJpeg(cv) }),
+    ...(window.CompressionStream ? await packPage(cv) : { jpg: await canvasJpeg(cv) }),
     iw: cv.width,
     ih: cv.height,
     pw: ((cv.width / OV_PX) * 72) / 25.4,

@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- 外部との通信をブラウザの仕組みで禁止する（画像・データはこのファイルの中だけで扱う） -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-mlt4Pq7bj3uQX0khttGZip6CFWSoPrb8f53V7cMVemI='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-E1DP0mOtpRXEi/wa+5YqBNkIS185tlz9FJoM8SGiI30='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
 <title>電子採点システム君</title>
 <style>
 :root {
@@ -1129,6 +1129,10 @@ p.ptline {
   grid-column: 2;
   grid-row: 1;
   top: 0;
+  /* 下の「戻る・次へ」の帯（約56px）の分を引いた高さに収め、はみ出す分は箱の中でスクロールする。
+     箱が画面より高いと、いちばん下までスクロールしたとき見出し（問の名前）が画面の上に隠れていた（2026-11-24 side） */
+  max-height: calc(100vh - 70px);
+  overflow-y: auto;
 }
 #wg-main.side.left #wg-model {
   grid-column: 1;
@@ -1741,7 +1745,11 @@ span.sp-c {
 #wg-grid.bys .wg-card.tall {
   flex: 0 0 auto;
   max-width: 100%;
-  min-width: 190px;
+  /* 左右の余白を 10px→6px にし、点数の並び（0・欄・/満点・満点）の幅は前と同じまま、カードを 8px 細くする。
+     1280×640 で氏名と縦書きの答案3枚が1段に並ぶ（前は 7px 足りず3枚目が下の段に落ちていた。2026-11-24 review2） */
+  min-width: 182px;
+  padding-left: 6px;
+  padding-right: 6px;
 }
 #wg-grid.bys .wg-card.tall img.ans {
   width: auto;
@@ -2939,6 +2947,9 @@ body.wfocus #wg-main.side #wg-model {
 }
 body.wfocus #wg-main.side .wg-mod {
   max-height: calc(100vh - var(--fbh, 48px) - 12px);
+}
+body.wfocus #wg-main.side #wg-model {
+  max-height: calc(100vh - var(--fbh, 48px) - 70px);
 }
 body.wfocus #wg-model .wg-mod {
   margin-top: 0;
@@ -7394,9 +7405,17 @@ function $(s) {
 }
 document.querySelectorAll('header > button').forEach(b => (b.onclick = () => showTab(b.dataset.tab)));
 // --- 版（バージョン）と更新履歴。番号は 年.月.日.その日の何回目か（10/06 以前は1日分をまとめて1つ）
-const APP_VER = '2026.11.24.3',
+const APP_VER = '2026.11.24.4',
   APP_DATE = '2026年11月24日';
 const HISTORY = [
+  [
+    '2026.11.24.4',
+    '11月24日',
+    [
+      '記述の採点で、国語の縦書きを「生徒ごと」に見ると、小さい画面（1280×640）で答案が下の段に落ちていたのを直し、1段に並ぶようにしました。点数は、いつも「0・点数の欄・満点」の形で入れます（配点の大きい問で点数ボタンが横に並び、カードが広がることがありました）。',
+      '縦書きの問で模範解答を答案の横に出しているとき、いちばん下までスクロールすると模範解答の見出しが画面の上に隠れていたのを直しました。模範解答の箱は画面の高さに収まり、長いときは箱の中でスクロールします。'
+    ]
+  ],
   [
     '2026.11.24.3',
     '11月24日',
@@ -13835,7 +13854,7 @@ function wCard(s, i, j, max, byS, tall) {
   const opts = wOpts(max),
     v = s.w[j];
   return (
-    `<div class="wg-card${v == null ? ' todo' : ''}${tall ? ' tall' : ''}${opts ? '' : ' cp'}" data-i="${i}" data-j="${j}" data-n="${opts ? opts.length : 0}"><div class="hd">${byS ? `<b class="wq">${esc(wLab(j))}</b><span class="muted">配点 ${fmt(max)}</span>` : `<b>${esc(idString(s)) || '学籍番号なし'}</b>${s.nameCrop ? `<img class="namecrop${s.p && s.p.vert ? ' v' : ''}" src="${s.nameCrop}">` : ''}`}${s.wink[j] < WBLANK ? '<span class="wg-blank">空欄？</span>' : ''}${v != null && v > max ? '<span class="wg-blank">配点を超えています</span>' : ''}</div>` +
+    `<div class="wg-card${v == null ? ' todo' : ''}${tall ? ' tall' : ''}${opts && !tall ? '' : ' cp'}" data-i="${i}" data-j="${j}" data-n="${opts ? opts.length : 0}"><div class="hd">${byS ? `<b class="wq">${esc(wLab(j))}</b><span class="muted">配点 ${fmt(max)}</span>` : `<b>${esc(idString(s)) || '学籍番号なし'}</b>${s.nameCrop ? `<img class="namecrop${s.p && s.p.vert ? ' v' : ''}" src="${s.nameCrop}">` : ''}`}${s.wink[j] < WBLANK ? '<span class="wg-blank">空欄？</span>' : ''}${v != null && v > max ? '<span class="wg-blank">配点を超えています</span>' : ''}</div>` +
     (s.wcrop[j]
       ? `<img class="ans" src="${s.wcrop[j]}" alt="${esc(wLab(j))}の答案">`
       : '<p class="err">記述欄の配置が分からないため表示できません</p>') +
@@ -13853,7 +13872,9 @@ function wgFit() {
     w = cs.map(c => c.clientWidth);
   cs.forEach((c, i) => {
     const n = +c.dataset.n;
-    c.classList.toggle('cp', !n || w[i] - 24 < n * 31);
+    // 生徒ごとの縦書き（tall）は、いつも「0・点数の欄・満点」。カードの幅が中身で決まるので、測った時の幅しだいで
+    // 点数ボタンの形になると、ボタンでカードが広がったままになり、答案が1段に並ばなかった（Windows で起きた。2026-11-24 review2）
+    c.classList.toggle('cp', !n || c.classList.contains('tall') || w[i] - 24 < n * 31);
   });
 }
 if (window.ResizeObserver) new ResizeObserver(() => wgFit()).observe($('#wg-grid'));

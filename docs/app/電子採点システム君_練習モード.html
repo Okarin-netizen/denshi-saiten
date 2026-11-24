@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- 外部との通信をブラウザの仕組みで禁止する（画像・データはこのファイルの中だけで扱う） -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-u9D0QZImHDdjInEllFY0/dxdx2tQD5Aw2HmHLU4DDKY=' 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-+LMa2kS39Q17NVILWfZ86s+wNOvJmA9b48kpEmnkfzo=' 'sha256-MA3y2oFyWswFJjZAMxiHN3vVK6uXWif0S6jKN0xDBHE='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-u9D0QZImHDdjInEllFY0/dxdx2tQD5Aw2HmHLU4DDKY=' 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-fCVLpcqZ4GaxXop9mny4yfMF2UBuCL7+y11mSphJvxU=' 'sha256-MA3y2oFyWswFJjZAMxiHN3vVK6uXWif0S6jKN0xDBHE='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
 <title>電子採点システム君</title>
 <style>
 :root {
@@ -524,6 +524,22 @@ button:disabled {
   align-items: center;
   margin-top: 6px;
   gap: 8px;
+}
+#ov-pick-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 2px 10px;
+  max-height: 170px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-top: 4px;
+}
+#ov-pick-list label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 #ov-opts label {
   margin-right: 14px;
@@ -4299,6 +4315,13 @@ body.wfocus #tab-written .wg-top :focus-visible {
         <label><input type="radio" name="ov-fn" value="name" checked> 学籍番号_氏名.pdf</label>
         <label><input type="radio" name="ov-fn" value="id"> 学籍番号.pdf（名前が文字化けするとき）</label></div>
     </details>
+    <div class="row" id="ov-who" hidden><b>出す答案</b>
+      <label><input type="radio" name="ov-who" value="all" id="ov-who-all" checked> 全員</label>
+      <label><input type="radio" name="ov-who" value="pick" id="ov-who-pick"> 選んだ生徒だけ</label><span id="ov-newsum" class="muted"></span></div>
+    <div id="ov-pick" hidden>
+      <div class="row"><button class="b" id="ov-pick-new">まだ出していない生徒を選ぶ</button><button class="b" id="ov-pick-none">すべて外す</button><span id="ov-pick-n" class="muted"></span><span class="muted">「済」はPDFにしたことがある答案です</span></div>
+      <div id="ov-pick-list"></div>
+    </div>
     <div class="row" style="margin-top:8px"><button class="b p" id="ov-go" disabled>返却用の答案を PDF で保存（印刷用）</button><button class="b" id="ov-zip" disabled>1人ずつのPDF（ZIP）で保存</button><progress id="ov-prog" value="0" max="1" hidden></progress><span id="ov-msg" class="muted"></span></div>
   </div>
 </section>
@@ -7384,9 +7407,16 @@ function $(s) {
 }
 document.querySelectorAll('header > button').forEach(b => (b.onclick = () => showTab(b.dataset.tab)));
 // --- 版（バージョン）と更新履歴。番号は 年.月.日.その日の何回目か（10/06 以前は1日分をまとめて1つ）
-const APP_VER = '2026.11.24.1',
+const APP_VER = '2026.11.24.2',
   APP_DATE = '2026年11月24日';
 const HISTORY = [
+  [
+    '2026.11.24.2',
+    '11月24日',
+    [
+      '返却用の答案を、生徒を選んで出せるようになりました（「6. 採点結果・出力」の「出す答案」）。欠席して後日受けた生徒などの答案を追加で読み取ると、まだPDFにしていない生徒にはじめからチェックが入るので、そのまま押せば追加の生徒の分だけをPDFにできます。'
+    ]
+  ],
   [
     '2026.11.24.1',
     '11月24日',
@@ -18305,7 +18335,107 @@ function ovDueLoad() {
   const t = curTest();
   $('#ov-due').value = (t && ovDueMap()[t.id]) || '';
   ovMoreSum();
+  ovWhoLoad();
 }
+// 一度PDFにした答案を覚え、あとから読み取った生徒（欠席して後日受けた生徒など）の分だけを出せるようにする（2026-11-24）
+// 覚えるのはテストごとに「学籍番号|ファイル名|ページ|左右」。読み直したり学籍番号を直したりした答案は、まだ出していない扱い
+const ovKey = r => [r.id, r.s.file, r.s.page, r.s.half || ''].join('|');
+function ovDoneMap() {
+  try {
+    return JSON.parse(localStorage.getItem('msovdone') || '{}') || {};
+  } catch (e) {
+    return {};
+  }
+}
+function ovDoneSet() {
+  const t = curTest();
+  return new Set((t && ovDoneMap()[t.id]) || []);
+}
+function ovMarkDone(rows) {
+  const t = curTest();
+  if (!t || !rows.length) return;
+  const m = ovDoneMap(),
+    d = new Set(m[t.id] || []);
+  rows.forEach(r => d.add(ovKey(r)));
+  m[t.id] = [...d];
+  lsSet('msovdone', JSON.stringify(m));
+}
+// まだ出していない答案（転出の生徒は入れない）。一度も出していなければ null
+function ovNewRows(sc) {
+  const d = ovDoneSet();
+  if (!d.size || !sc) return null;
+  return sc.rows.filter(r => !r.mv && !d.has(ovKey(r)));
+}
+// 「出す答案」: 全員／選んだ生徒だけ。選ぶ一覧には、まだ出していない生徒にはじめからチェックを入れておく（おかだ「両方」2026-11-24）
+let ovWhoSig = '';
+const ovPicked = new Set();
+function ovWhoLoad() {
+  const sc = S.scored,
+    rows = sc ? sc.rows.filter(r => !r.mv) : [];
+  $('#ov-who').hidden = !rows.length;
+  if (!rows.length) return ovPickShow();
+  const nr = ovNewRows(sc),
+    done = ovDoneSet(),
+    sig = (curTest() || {}).id + '|' + (nr || []).map(ovKey).join(',');
+  $('#ov-newsum').textContent = nr
+    ? nr.length
+      ? `（まだ出していない ${nr.length}人: ` +
+        nr
+          .slice(0, 5)
+          .map(r => r.id + (r.name ? ' ' + r.name : ''))
+          .join('、') +
+        (nr.length > 5 ? ` ほか${nr.length - 5}人` : '') +
+        '）'
+      : '（全員分を出してあります）'
+    : '';
+  // 前に出した答案と、まだ出していない答案がまざったら（あとから読み取ったら）、まだの生徒を選んでおく
+  if (sig !== ovWhoSig) {
+    ovWhoSig = sig;
+    if (nr && nr.length) {
+      ovPicked.clear();
+      nr.forEach(r => ovPicked.add(ovKey(r)));
+      $('#ov-who-pick').checked = true;
+    } else if (nr) $('#ov-who-all').checked = true;
+  }
+  const keys = new Set(rows.map(ovKey));
+  [...ovPicked].forEach(k => keys.has(k) || ovPicked.delete(k));
+  $('#ov-pick-list').innerHTML = rows
+    .map(r => {
+      const k = ovKey(r);
+      return (
+        `<label><input type="checkbox" data-k="${esc(k)}"${ovPicked.has(k) ? ' checked' : ''}> ${esc(r.id)}` +
+        (r.name ? ' ' + esc(r.name) : '') +
+        (done.has(k) ? ' <span class="muted">済</span>' : '') +
+        '</label>'
+      );
+    })
+    .join('');
+  ovPickShow();
+}
+function ovPickShow() {
+  const on = !$('#ov-who').hidden && radioVal('ov-who') === 'pick';
+  $('#ov-pick').hidden = !on;
+  $('#ov-pick-new').hidden = !ovNewRows(S.scored);
+  $('#ov-pick-n').textContent = `${ovPicked.size}人を選んでいます`;
+}
+$('#ov-who').addEventListener('change', ovPickShow);
+$('#ov-pick-list').addEventListener('change', e => {
+  const k = e.target.dataset.k;
+  if (k == null) return;
+  if (e.target.checked) ovPicked.add(k);
+  else ovPicked.delete(k);
+  ovPickShow();
+});
+const ovPickSet = list => {
+  ovPicked.clear();
+  list.forEach(r => ovPicked.add(ovKey(r)));
+  $('#ov-pick-list')
+    .querySelectorAll('input[data-k]')
+    .forEach(c => (c.checked = ovPicked.has(c.dataset.k)));
+  ovPickShow();
+};
+$('#ov-pick-new').onclick = () => ovPickSet(ovNewRows(S.scored) || []);
+$('#ov-pick-none').onclick = () => ovPickSet([]);
 function ovMoreSum() {
   const c = ovCfg();
   $('#ov-moresum').textContent =
@@ -18756,7 +18886,7 @@ function retGroups(rows, ord) {
   return [...m.values()];
 }
 // 学級の表紙（先生用）: 人数・平均・最高・最低・答案のない生徒
-function coverPage(g, sc) {
+function coverPage(g, sc, onlyNew) {
   const PW = 210,
     PH = 297,
     M = OV_PX,
@@ -18781,7 +18911,8 @@ function coverPage(g, sc) {
     todo = g.rows.filter(r => r.todo);
   line('先生用（生徒には配りません）', 4, false, 2);
   line(`${t ? t.name : 'テスト'}　返却する答案`, 7, true, 2);
-  line(g.lab || '全員', 10, true, 6);
+  line(g.lab || '全員', 10, true, onlyNew ? 2 : 6);
+  if (onlyNew) line('選んだ生徒だけ（あとから読み取った生徒の分など）', 5, true, 4);
   line(`答案 ${g.rows.length}枚（${g.rows[0].id} 〜 ${g.rows[g.rows.length - 1].id}）`, 5);
   if (rs.length)
     line(
@@ -18806,10 +18937,10 @@ function coverPage(g, sc) {
   return cv;
 }
 // 記述の未採点がある答案: 「除いて作る／このまま作る／やめる」を選んでもらう。要確認の用紙は今までどおり確かめる
-function ovAsk(sc) {
+function ovAsk(sc, rows) {
   const un = S.sheets.filter(s => issueCount(s)).length;
   if (un && !confirm(`要確認が残っている用紙が ${un} 枚あります。このまま出力しますか？`)) return Promise.resolve(null);
-  const td = sc.rows.filter(r => r.todo && !r.mv);
+  const td = rows.filter(r => r.todo && !r.mv);
   if (!td.length) return Promise.resolve('all');
   const d = $('#ov-dlg');
   $('#ov-dlgmsg').textContent =
@@ -18909,13 +19040,19 @@ async function ovMake(zip) {
     msg.textContent = '書き込む項目を1つ以上選んでください。';
     return;
   }
-  const how = await ovAsk(sc);
+  const nr = radioVal('ov-who') === 'pick' ? sc.rows.filter(r => !r.mv && ovPicked.has(ovKey(r))) : null,
+    base0 = nr || sc.rows;
+  if (nr && !nr.length) {
+    msg.textContent = '「選んだ生徒だけ」の一覧で、出す生徒にチェックを入れてください。';
+    return;
+  }
+  const how = await ovAsk(sc, base0);
   if (!how) {
     if (window.__onOvDone) window.__onOvDone();
     return;
   }
   const groups = retGroups(
-    sc.rows.filter(r => how === 'all' || !r.todo),
+    base0.filter(r => how === 'all' || !r.todo),
     o.ord
   ).filter(g => g.rows.length);
   const jobs = [];
@@ -18948,13 +19085,13 @@ async function ovMake(zip) {
         }
       name = `返却用_${base}.zip`;
       downloadBlob(zipStore(files, 'application/zip'), name); // 答案は圧縮ずみなので、無圧縮の ZIP
-      what = `${files.length}人分のPDF`;
+      what = `${files.length}人分のPDF${nr ? `・選んだ${nr.length}人だけ` : ''}`;
     } else {
       const list = [];
       let nc = 0;
       for (const g of groups) {
         if (o.ord === 'cls') {
-          list.push(await pageOf(coverPage(g, sc)));
+          list.push(await pageOf(coverPage(g, sc, !!nr)));
           nc++;
         }
         const inG = new Set(g.rows);
@@ -18962,8 +19099,11 @@ async function ovMake(zip) {
       }
       name = `採点済み答案_${base}.pdf`;
       downloadBlob(buildPdf(list), name);
-      what = `${list.length} ページ・${o.ord === 'cls' ? `学級→出席番号の順、表紙 ${nc}枚` : '学籍番号順'}${jobs.some(j => j.s !== j.r.s) ? '・表裏の順' : ''}`;
+      what = `${list.length} ページ・${nr ? `選んだ${nr.length}人だけ・` : ''}${o.ord === 'cls' ? `学級→出席番号の順、表紙 ${nc}枚` : '学籍番号順'}${jobs.some(j => j.s !== j.r.s) ? '・表裏の順' : ''}`;
     }
+    const doneRows = groups.flatMap(g => g.rows).filter(r => jobs.some(j => j.r === r && pages.has(j)));
+    ovMarkDone(doneRows);
+    ovWhoLoad();
     msg.textContent =
       `${savedMsg(name)}（${what}）` +
       (low ? `　${low} ページは元のスキャンファイルがないため、画質を下げて作りました。` : '') +

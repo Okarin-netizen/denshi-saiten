@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- 外部との通信をブラウザの仕組みで禁止する（画像・データはこのファイルの中だけで扱う） -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-u9D0QZImHDdjInEllFY0/dxdx2tQD5Aw2HmHLU4DDKY=' 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-fCVLpcqZ4GaxXop9mny4yfMF2UBuCL7+y11mSphJvxU=' 'sha256-MA3y2oFyWswFJjZAMxiHN3vVK6uXWif0S6jKN0xDBHE='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-u9D0QZImHDdjInEllFY0/dxdx2tQD5Aw2HmHLU4DDKY=' 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-mlt4Pq7bj3uQX0khttGZip6CFWSoPrb8f53V7cMVemI=' 'sha256-MA3y2oFyWswFJjZAMxiHN3vVK6uXWif0S6jKN0xDBHE='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
 <title>電子採点システム君</title>
 <style>
 :root {
@@ -3860,7 +3860,7 @@ body.wfocus #tab-written .wg-top :focus-visible {
   <p class="muted" style="margin-top:0">ふだんは自動で保存されています。このファイルは、別のパソコンで続きをするときや、念のための控えに使います。<span id="ex-dir"></span></p>
   <p><label><input type="radio" name="ex-scope" value="cur" checked> 選択中のテストだけ</label><br>
      <label><input type="radio" name="ex-scope" value="all"> すべてのテスト</label></p>
-  <p id="ex-sheets-row"><label><input type="checkbox" id="ex-sheets"> このテストの読み取り結果（<span id="ex-n"></span>枚）も含める</label><br>
+  <p id="ex-sheets-row"><label><input type="checkbox" id="ex-sheets"> <span id="ex-what"></span>も含める</label><br>
      <span class="muted">含めると、あとでファイルを読み込んで確認や採点の続きができます。答案の画像が入るのでファイルが大きくなり、取り扱いに注意が必要です。</span></p>
   <div class="row"><button class="b p" id="ex-ok">保存する</button><button class="b" id="ex-cancel">やめる</button></div>
 </dialog>
@@ -7407,9 +7407,16 @@ function $(s) {
 }
 document.querySelectorAll('header > button').forEach(b => (b.onclick = () => showTab(b.dataset.tab)));
 // --- 版（バージョン）と更新履歴。番号は 年.月.日.その日の何回目か（10/06 以前は1日分をまとめて1つ）
-const APP_VER = '2026.11.24.2',
+const APP_VER = '2026.11.24.3',
   APP_DATE = '2026年11月24日';
 const HISTORY = [
+  [
+    '2026.11.24.3',
+    '11月24日',
+    [
+      '「ファイルに保存」で「すべてのテスト」を選んで読み取り結果も含めると、選んでいるテストの答案しか入っていなかったのを直しました。読み取り結果のあるテストの答案（画像も）が全部入り、読み込むとどのテストにも戻ります。チェックの横に、何テスト・何枚入るかを出します。'
+    ]
+  ],
   [
     '2026.11.24.2',
     '11月24日',
@@ -12191,34 +12198,84 @@ function safeName(s) {
 }
 // 「ファイルに保存」の箱にも保存先を書く（背の低い画面では左の列の知らせが1行で切れて読めないため。2026-11-19 操作の見直し 仕上げ6）
 $('#ex-dir').textContent = SAVE_DIR;
+// 読み取り結果をファイルに入れるテスト（選択中のテストは今の画面の分、ほかはテストごとに預けてある分）
+function exSheetsOf(id) {
+  return id === TS.cur ? S.sheets : (S.store.get(id) || {}).sheets || [];
+}
+// 「すべてのテスト」を選ぶと、ほかのテストの読み取り結果も入れる（2026-11-24 前は選択中のテストの分しか入らなかった）
+function exScopeAll() {
+  return document.querySelector('input[name=ex-scope]:checked').value === 'all';
+}
+function exSheetsRow() {
+  const all = exScopeAll(),
+    l = (all ? TS.list : [curTest()]).filter(t => exSheetsOf(t.id).length),
+    n = l.reduce((a, t) => a + exSheetsOf(t.id).length, 0);
+  $('#ex-sheets-row').hidden = !n;
+  $('#ex-what').textContent =
+    all && l.length > 1
+      ? `すべてのテストの読み取り結果（${l.length} テスト、合計 ${n} 枚）`
+      : `${all ? `テスト「${l[0] ? l[0].name : ''}」` : 'このテスト'}の読み取り結果（${n} 枚）`;
+}
+document.querySelectorAll('input[name=ex-scope]').forEach(r => (r.onchange = exSheetsRow));
 $('#ts-export').onclick = () => {
-  $('#ex-sheets-row').hidden = !S.sheets.length;
-  $('#ex-n').textContent = S.sheets.length;
   $('#ex-sheets').checked = false;
   document.querySelector('input[name=ex-scope][value=cur]').checked = true;
+  exSheetsRow();
   $('#ex-dlg').showModal();
 };
 $('#ex-cancel').onclick = () => $('#ex-dlg').close();
 $('#ex-ok').onclick = () => {
-  const all = document.querySelector('input[name=ex-scope]:checked').value === 'all',
-    withSheets = S.sheets.length && $('#ex-sheets').checked;
+  const all = exScopeAll();
   const tl = all ? TS.list : [curTest()],
     data = exportTests(tl);
+  const withSheets = !$('#ex-sheets-row').hidden && $('#ex-sheets').checked;
   if (withSheets) {
-    data.sheets = sheetOut(S.sheets, true);
-    data.sheetsTest = TS.cur;
+    // 選択中のテストの分は前の版と同じ形（sheets・sheetsTest）。ほかのテストの分は sheetsMore に入れる（前の版で読んでも選択中の分は戻る）
+    if (S.sheets.length && tl.includes(curTest())) {
+      data.sheets = sheetOut(S.sheets, true);
+      data.sheetsTest = TS.cur;
+    }
+    const more = tl
+      .filter(t => t.id !== TS.cur && exSheetsOf(t.id).length)
+      .map(t => ({ test: t.id, sheets: sheetOut(exSheetsOf(t.id), true) }));
+    if (more.length) data.sheetsMore = more;
   }
   const base = safeName(all ? 'すべてのテスト' : curTest().name);
-  downloadText(
-    JSON.stringify(data),
-    `マークシート_${base}${withSheets ? '_読み取り結果つき' : ''}_${ymdNow()}.json`,
-    'application/json'
-  );
-  if (withSheets) S.exported = true;
+  downloadBlob(jsonBlob(data), `マークシート_${base}${withSheets ? '_読み取り結果つき' : ''}_${ymdNow()}.json`);
+  if (withSheets) {
+    if (tl.includes(curTest())) S.exported = true;
+    for (const t of tl) if (S.store.has(t.id)) S.store.get(t.id).exported = true;
+  }
   fsMarkSaved(tl);
   $('#ex-dlg').close();
   $('#ts-msg').textContent = savedMsg();
 };
+// 答案の画像が多いと、1本の長い文字にすると上限（ブラウザで数百MB）を超えるので、用紙1枚ずつ文字にして Blob でつなぐ
+function jsonBlob(data) {
+  const parts = [],
+    sheetsJson = l => {
+      parts.push('[');
+      l.forEach((s, i) => parts.push((i ? ',' : '') + JSON.stringify(s)));
+      parts.push(']');
+    };
+  const { sheets, sheetsMore, ...rest } = data;
+  parts.push(JSON.stringify(rest).slice(0, -1));
+  if (sheets) {
+    parts.push(',"sheets":');
+    sheetsJson(sheets);
+  }
+  if (sheetsMore) {
+    parts.push(',"sheetsMore":[');
+    sheetsMore.forEach((m, i) => {
+      parts.push((i ? ',' : '') + '{"test":' + JSON.stringify(m.test) + ',"sheets":');
+      sheetsJson(m.sheets);
+      parts.push('}');
+    });
+    parts.push(']');
+  }
+  parts.push('}');
+  return new Blob(parts, { type: 'application/json' });
+}
 $('#ts-import').onclick = () => {
   $('#ts-file').value = '';
   $('#ts-file').click();
@@ -12251,6 +12308,7 @@ $('#ts-file').onchange = async () => {
   let added = 0,
     replaced = 0,
     first = null;
+  const idMap = new Map(); // 別のテストとして足したときの、ファイルの中の番号 → 新しい番号
   for (const t of tests) {
     const ex = TS.list.find(x => x.id === t.id);
     if (ex) {
@@ -12269,6 +12327,7 @@ $('#ts-file').onchange = async () => {
       // 別のテストとして足すときは、読み取り結果もその新しいテストに付ける（元のテストの結果を置き換えない）
       const oid = t.id;
       t.id = newId();
+      idMap.set(oid, t.id);
       if (d.sheetsTest === oid) d.sheetsTest = t.id;
     }
     TS.list.push(t);
@@ -12280,35 +12339,67 @@ $('#ts-file').onchange = async () => {
     fsBase(x, true);
   }
   let extra = '';
+  // 読み取り結果: 選択中だったテストの分（sheets）と、ほかのテストの分（sheetsMore。「すべてのテスト」で保存したとき）
+  const okIds = new Set(tests.map(t => t.id)),
+    mainSh = Array.isArray(d.sheets) ? d.sheets : [],
+    more = (Array.isArray(d.sheetsMore) ? d.sheetsMore : [])
+      .filter(m => m && Array.isArray(m.sheets) && m.sheets.length && typeof m.test === 'string')
+      .map(m => ({ id: idMap.get(m.test) || m.test, sheets: m.sheets }))
+      .filter(m => okIds.has(m.id) && m.id !== d.sheetsTest),
+    nAll = mainSh.length + more.reduce((a, m) => a + m.sheets.length, 0),
+    nTest = (mainSh.length ? 1 : 0) + more.length;
   if (
-    Array.isArray(d.sheets) &&
-    d.sheets.length &&
+    nAll &&
     confirm(
-      `読み取り結果（${d.sheets.length}枚）も入っています。読み込みますか？\nそのテストの今の読み取り結果は置き換えられます。`
+      `読み取り結果（${nTest > 1 ? `${nTest} テスト、合計 ` : ''}${nAll}枚）も入っています。読み込みますか？\nそのテストの今の読み取り結果は置き換えられます。`
     )
   ) {
-    const sh = d.sheets.map(x => cleanSheet(x)).filter(Boolean);
-    stashSheets();
-    S.owner = null;
-    S.sheets = sh;
-    WG.hist = [];
-    S.lastDel = null;
-    S.srcFiles = null;
-    wgUndoBtn();
-    S.scored = null;
-    S.exported = true;
-    S.cur = 0;
-    renderReadTable();
-    $('#sc-table').innerHTML = '';
-    $('#sc-view').hidden = true;
-    $('#sc-csv').disabled = true;
-    extra = `読み取り結果 ${sh.length} 枚を読み込みました。`;
-    if (d.sheetsTest && TS.list.some(t => t.id === d.sheetsTest)) first = d.sheetsTest;
+    let nm = 0;
+    if (mainSh.length) {
+      const sh = mainSh.map(x => cleanSheet(x)).filter(Boolean);
+      stashSheets();
+      S.owner = null;
+      S.sheets = sh;
+      WG.hist = [];
+      S.lastDel = null;
+      S.srcFiles = null;
+      wgUndoBtn();
+      S.scored = null;
+      S.exported = true;
+      S.cur = 0;
+      renderReadTable();
+      $('#sc-table').innerHTML = '';
+      $('#sc-view').hidden = true;
+      $('#sc-csv').disabled = true;
+      nm = sh.length;
+      if (d.sheetsTest && TS.list.some(t => t.id === d.sheetsTest)) first = d.sheetsTest;
+    }
+    // ほかのテストの分は、そのテストに預けておく（テストを切り替えると表示される）。今の画面のテストの分なら画面の分を入れ替える
+    for (const m of more) {
+      const sh = m.sheets.map(x => cleanSheet(x)).filter(Boolean);
+      nm += sh.length;
+      if (m.id === S.owner) {
+        S.sheets = sh;
+        WG.hist = [];
+        S.lastDel = null;
+        S.srcFiles = null;
+        wgUndoBtn();
+        S.scored = null;
+        S.exported = true;
+        S.cur = 0;
+        renderReadTable();
+        $('#sc-table').innerHTML = '';
+        $('#sc-view').hidden = true;
+        $('#sc-csv').disabled = true;
+      } else S.store.set(m.id, { sheets: sh, cur: 0, scored: null, exported: true, srcFiles: null });
+    }
+    extra = `読み取り結果 ${nm} 枚を読み込みました。`;
+    if (nTest > 1) extra += `（${nTest} テスト分。左上のテストの選択で切り替えると表示されます）`;
   }
   if (first) switchTest(first);
   else saveTests();
   msg.textContent = `${tests.length ? `テストを ${added} 件追加、${replaced} 件上書きしました。` : 'テストは入っていませんでした。'}${d.tests.length > tests.length ? `（${d.tests.length - tests.length} 件は壊れていたので読み込みませんでした）` : ''}${extra}`;
-  if (extra) {
+  if (extra && mainSh.length) {
     const m = syncTestToSheets();
     if (m) msg.textContent += m.text;
   }

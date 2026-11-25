@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- 外部との通信をブラウザの仕組みで禁止する（画像・データはこのファイルの中だけで扱う） -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-u9D0QZImHDdjInEllFY0/dxdx2tQD5Aw2HmHLU4DDKY=' 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-PvOiI5hwfY8p/I+CT5ZrXuVJUQZREPs2u2eJxgRdum0=' 'sha256-MA3y2oFyWswFJjZAMxiHN3vVK6uXWif0S6jKN0xDBHE='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-u9D0QZImHDdjInEllFY0/dxdx2tQD5Aw2HmHLU4DDKY=' 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-FMTknqFMwf+vAIiXkEHuJeh2MLodqEZ5Yi88QJ5l2yk=' 'sha256-MA3y2oFyWswFJjZAMxiHN3vVK6uXWif0S6jKN0xDBHE='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
 <title>電子採点システム君</title>
 <style>
 :root {
@@ -7418,9 +7418,16 @@ function $(s) {
 }
 document.querySelectorAll('header > button').forEach(b => (b.onclick = () => showTab(b.dataset.tab)));
 // --- 版（バージョン）と更新履歴。番号は 年.月.日.その日の何回目か（10/06 以前は1日分をまとめて1つ）
-const APP_VER = '2026.11.25.1',
+const APP_VER = '2026.11.25.2',
   APP_DATE = '2026年11月25日';
 const HISTORY = [
+  [
+    '2026.11.25.2',
+    '11月25日',
+    [
+      'プログラムの中を整理しました（採点結果の表と「3. 確認」のカードを作る所を、行・欄ごとの小さな部品に分けました。使い方と読み取り・採点の結果は変わりません）。'
+    ]
+  ],
   [
     '2026.11.25.1',
     '11月25日',
@@ -15812,64 +15819,72 @@ function score() {
   S.scored.qo = QO;
   const qh = i =>
     `<th class="c">${esc(qTitle(qr, i))}${cm.has(i) ? `<br><small class="cgtag" title="${S.key.cg[cm.get(i)].u ? '順不同完答' : '完答'}">${cgName(cm.get(i))}</small>` : ''}</th>`;
+  // 採点結果の表（#sc-table）の行を作る部品。表は「見出し・正答・配点・生徒ごと・平均」の行の順。
+  // どの行も「学籍番号・（クラス）・氏名欄・得点・順位・（クラス内順位）・偏差値・観点…・状態・問ごとの列…」の並び。
+  // 列を足すときは、この5つの行すべてに同じ位置で1つずつ足す（ずれると列の見出しと中身が合わなくなる）
+  const cCls = gs.useC ? '<td></td>' : '',
+    siOf = r => S.sheets.indexOf(r.s);
+  const scHeadRow = vc =>
+    `<tr><th>学籍番号</th>${gs.useC ? '<th>クラス</th>' : ''}<th>氏名欄</th><th>得点</th><th>順位</th>${vc ? '<th title="このクラスの中での順位">クラス内<br>順位</th>' : ''}<th>偏差値</th>${cats.map(c => `<th title="${esc(c)}">${esc(catAbbr(S.key, c))}</th>`).join('')}<th>状態</th>${cells(qh, (j, i) => `<th class="c wcol">${esc(i != null ? qTitle(qr, i) : wLab(j))}<br><small class="muted">記述</small></th>`)}</tr>`;
+  const keyCell = i => {
+    const k = key[i];
+    return k >= 0
+      ? `<td class="c"><b>${esc(lab(i, k))}</b></td>`
+      : qr[i].w
+        ? '<td class="c muted">記述</td>'
+        : '<td class="c muted" title="正答が空なので採点しません">－</td>';
+  };
+  const scKeyRow = xr =>
+    `<tr class="keyrow"><td>正答</td>${cCls}<td></td><td></td><td></td>${xr}<td></td>${catMax.map(() => '<td></td>').join('')}<td></td>${cells(keyCell, () => '<td class="c wcol muted">記述</td>')}</tr>`;
+  const ptsCell = i => {
+    const g = cm.get(i);
+    return !act[i]
+      ? '<td class="c muted">－</td>'
+      : g != null && S.key.cg[g].q[0] !== i
+        ? `<td class="c muted" title="${cgName(g)}の配点に含みます"><small>組</small></td>`
+        : `<td class="c">${fmt(pts[i])}</td>`;
+  };
+  const scPtsRow = xr =>
+    `<tr class="keyrow"><td>配点</td>${cCls}<td></td><td title="満点"><b>${fmt(maxTot)}</b></td><td></td>${xr}<td></td>${catMax.map(m => `<td>${fmt(m)}</td>`).join('')}<td></td>${cells(ptsCell, j => `<td class="c wcol">${fmt(pts[n + j])}</td>`)}</tr>`;
+  // 生徒の1行のうち、学籍番号の欄（別室・追試などと、交流・転出の印）
+  const idCell = r =>
+    `<td>${esc(r.id)}${r.ex ? ` <span class="tag ex">${esc(EXL[r.ex])}</span>` : ''}${r.kr ? ` <span class="tag kr" title="所属: ${esc(r.kr.own || '－')}・交流: ${esc(r.kr.kr)}">交流</span>` : ''}${r.mv ? ' <span class="tag mv" title="名簿で転出にした生徒（集計に入れていません）">転出</span>' : ''}</td>`;
+  // 氏名欄（用紙の氏名欄の切り抜きと、名簿の氏名）
+  const nameCell = r =>
+    `<td>${r.s.nameCrop ? `<img class="namecrop${r.s.p && r.s.p.vert ? ' v' : ''}" src="${r.s.nameCrop}">` : ''}${r.name ? `<div>${esc(r.name)}</div>` : ''}</td>`;
+  // 状態の欄（別室・追試・集計から外す の選択と、要確認・記述の未採点へ移るボタン）
+  const stateCell = r =>
+    `<td class="st"><select class="sc-ex${r.ex ? '' : ' n'}" data-si="${siOf(r)}" title="別室・追試・集計から外す を選べます">${['', ...EXS].map(v => `<option value="${v}"${v === r.ex ? ' selected' : ''}>${v ? EXL[v] : '－'}</option>`).join('')}</select> ${r.issue ? `<button class="tag ng go" data-go="rv" data-si="${siOf(r)}" title="「3. 確認」でこの用紙を開く">要確認 ${r.issue} ›</button> ` : ''}${r.todo ? `<button class="tag ng go" data-go="wg" data-si="${siOf(r)}" data-j="${wt(r.ws)}" title="記述の未採点 ${r.todo} 件。「5. 記述の採点」でこの答案を開く">未採点 ${r.todo} ›</button>` : ''}</td>`;
+  const scStudentRow = (r, inl, vc) =>
+    `<tr${r.out ? ' class="out" title="集計（平均・順位・偏差値）に入れていません"' : ''}>${idCell(r)}${gs.useC ? `<td>${esc(r.cls)}</td>` : ''}${nameCell(r)}<td><b>${fmt(r.tot)}</b></td><td>${r.rank}${gs.useG && !r.out ? `<span class="muted">/${r.gN}</span>` : ''}</td>${vc ? `<td>${r.out ? '－' : 1 + inl.filter(x => x.tot > r.tot).length}</td>` : ''}<td>${r.dev == null ? '－' : r.dev.toFixed(1)}</td>${r.sub.map((x, j) => `<td>${fmt(x)}${r.abc[j] ? ` <b class="abc abc${r.abc[j]}">${r.abc[j]}</b>` : ''}</td>`).join('')}${stateCell(r)}${cells(
+      i => `<td class="c ${r.ok[i] === false ? 'wrong' : ''}">${ansTxt(r.ans[i], i) || '－'}</td>`,
+      j => {
+        const v = r.ws[j];
+        return `<td class="c wcol">${v == null ? `<button class="tag ng go" data-go="wg" data-si="${siOf(r)}" data-j="${j}" title="この答案を採点する">未</button>` : fmt(r.got[n + j])}</td>`;
+      }
+    )}</tr>`;
+  const pct = x => (x == null ? '' : Math.round(x * 100) + '%');
+  const scAvgRow = (inl, vc, xr, rate, wrate) =>
+    `<tr><td>平均・正答率${vc ? `<br><small>${esc(vc)}</small>` : ''}</td>${cCls}<td></td><td>${inl.length ? fmt(avg(inl.map(r => r.tot))) : ''}</td><td></td>${xr}<td></td>${cats.map((_, j) => `<td>${inl.length ? fmt(avg(inl.map(r => r.sub[j]))) : ''}</td>`).join('')}<td></td>${cells(
+      i => `<td class="c">${pct(rate[i])}</td>`,
+      j => `<td class="c wcol">${pct(wrate[j])}</td>`
+    )}</tr>`;
   // 表に出す生徒: クラスでしぼり、選んだ順に並べる（採点・CSV・返却用の答案の順は変えない）
   const drawSc = () => {
     const { list, inl, vc } = scView(rows),
       xr = vc ? '<td></td>' : '',
+      // 問ごとの正答率（マーク）と、記述の得点率（平均点÷配点）。どちらも表に出している生徒（集計に入れる人）で計算する
       rate = key.map((k, i) => (k < 0 || !inl.length ? null : inl.filter(r => r.ok[i]).length / inl.length)),
       wrate = Array.from({ length: wn }, (_, j) => {
         const v = inl.filter(r => r.ws[j] != null).map(r => r.got[n + j]);
         return v.length && pts[n + j] ? avg(v) / pts[n + j] : null;
       });
     $('#sc-table').innerHTML =
-      `<tr><th>学籍番号</th>${gs.useC ? '<th>クラス</th>' : ''}<th>氏名欄</th><th>得点</th><th>順位</th>${vc ? '<th title="このクラスの中での順位">クラス内<br>順位</th>' : ''}<th>偏差値</th>${cats.map(c => `<th title="${esc(c)}">${esc(catAbbr(S.key, c))}</th>`).join('')}<th>状態</th>${cells(qh, (j, i) => `<th class="c wcol">${esc(i != null ? qTitle(qr, i) : wLab(j))}<br><small class="muted">記述</small></th>`)}</tr>` +
-      `<tr class="keyrow"><td>正答</td>${gs.useC ? '<td></td>' : ''}<td></td><td></td><td></td>${xr}<td></td>${catMax.map(() => '<td></td>').join('')}<td></td>${cells(
-        i => {
-          const k = key[i];
-          return k >= 0
-            ? `<td class="c"><b>${esc(lab(i, k))}</b></td>`
-            : qr[i].w
-              ? '<td class="c muted">記述</td>'
-              : '<td class="c muted" title="正答が空なので採点しません">－</td>';
-        },
-        () => '<td class="c wcol muted">記述</td>'
-      )}</tr>` +
-      `<tr class="keyrow"><td>配点</td>${gs.useC ? '<td></td>' : ''}<td></td><td title="満点"><b>${fmt(maxTot)}</b></td><td></td>${xr}<td></td>${catMax.map(m => `<td>${fmt(m)}</td>`).join('')}<td></td>${cells(
-        i => {
-          const g = cm.get(i);
-          return !act[i]
-            ? '<td class="c muted">－</td>'
-            : g != null && S.key.cg[g].q[0] !== i
-              ? `<td class="c muted" title="${cgName(g)}の配点に含みます"><small>組</small></td>`
-              : `<td class="c">${fmt(pts[i])}</td>`;
-        },
-        j => `<td class="c wcol">${fmt(pts[n + j])}</td>`
-      )}</tr>` +
-      list
-        .map(
-          r =>
-            `<tr${r.out ? ' class="out" title="集計（平均・順位・偏差値）に入れていません"' : ''}><td>${esc(r.id)}${r.ex ? ` <span class="tag ex">${esc(EXL[r.ex])}</span>` : ''}${r.kr ? ` <span class="tag kr" title="所属: ${esc(r.kr.own || '－')}・交流: ${esc(r.kr.kr)}">交流</span>` : ''}${r.mv ? ' <span class="tag mv" title="名簿で転出にした生徒（集計に入れていません）">転出</span>' : ''}</td>${gs.useC ? `<td>${esc(r.cls)}</td>` : ''}<td>${r.s.nameCrop ? `<img class="namecrop${r.s.p && r.s.p.vert ? ' v' : ''}" src="${r.s.nameCrop}">` : ''}${r.name ? `<div>${esc(r.name)}</div>` : ''}</td><td><b>${fmt(r.tot)}</b></td><td>${r.rank}${gs.useG && !r.out ? `<span class="muted">/${r.gN}</span>` : ''}</td>${vc ? `<td>${r.out ? '－' : 1 + inl.filter(x => x.tot > r.tot).length}</td>` : ''}<td>${r.dev == null ? '－' : r.dev.toFixed(1)}</td>${r.sub.map((x, j) => `<td>${fmt(x)}${r.abc[j] ? ` <b class="abc abc${r.abc[j]}">${r.abc[j]}</b>` : ''}</td>`).join('')}<td class="st"><select class="sc-ex${r.ex ? '' : ' n'}" data-si="${S.sheets.indexOf(r.s)}" title="別室・追試・集計から外す を選べます">${['', ...EXS].map(v => `<option value="${v}"${v === r.ex ? ' selected' : ''}>${v ? EXL[v] : '－'}</option>`).join('')}</select> ${r.issue ? `<button class="tag ng go" data-go="rv" data-si="${S.sheets.indexOf(r.s)}" title="「3. 確認」でこの用紙を開く">要確認 ${r.issue} ›</button> ` : ''}${r.todo ? `<button class="tag ng go" data-go="wg" data-si="${S.sheets.indexOf(r.s)}" data-j="${wt(r.ws)}" title="記述の未採点 ${r.todo} 件。「5. 記述の採点」でこの答案を開く">未採点 ${r.todo} ›</button>` : ''}</td>${cells(
-              i => {
-                const a = r.ans[i];
-                return `<td class="c ${r.ok[i] === false ? 'wrong' : ''}">${ansTxt(a, i) || '－'}</td>`;
-              },
-              j => {
-                const v = r.ws[j];
-                return `<td class="c wcol">${v == null ? `<button class="tag ng go" data-go="wg" data-si="${S.sheets.indexOf(r.s)}" data-j="${j}" title="この答案を採点する">未</button>` : fmt(r.got[n + j])}</td>`;
-              }
-            )}</tr>`
-        )
-        .join('') +
-      `<tr><td>平均・正答率${vc ? `<br><small>${esc(vc)}</small>` : ''}</td>${gs.useC ? '<td></td>' : ''}<td></td><td>${inl.length ? fmt(avg(inl.map(r => r.tot))) : ''}</td><td></td>${xr}<td></td>${cats.map((_, j) => `<td>${inl.length ? fmt(avg(inl.map(r => r.sub[j]))) : ''}</td>`).join('')}<td></td>${cells(
-        i => {
-          const x = rate[i];
-          return `<td class="c">${x == null ? '' : Math.round(x * 100) + '%'}</td>`;
-        },
-        j => {
-          const x = wrate[j];
-          return `<td class="c wcol">${x == null ? '' : Math.round(x * 100) + '%'}</td>`;
-        }
-      )}</tr>`;
+      scHeadRow(vc) +
+      scKeyRow(xr) +
+      scPtsRow(xr) +
+      list.map(r => scStudentRow(r, inl, vc)).join('') +
+      scAvgRow(inl, vc, xr, rate, wrate);
     scViewBar(rows, inl, vc);
     requestAnimationFrame(scHs);
   };
@@ -17864,23 +17879,26 @@ function drawCheck() {
             : 'なし'
         }${mvOut ? `<span class="muted">（転出した ${mvOut} 人は入れていません）</span>` : ''}`
       : '');
+  // 「3. 確認」の用紙のカード1枚。行ごとに部品に分ける（カードの HTML は部品を改行と字下げでつないだもの）:
+  //   上の段（学籍番号の切り抜きと入力欄）・印（正解用紙・交流・転出・直した・要確認…）・氏名欄・裏面・下の段（名簿の氏名と、別室・追試の選択）
+  const ckTop = (s, id) =>
+    `<div class="ck-top">${s.idCrop ? `<img class="ck-idimg" src="${s.idCrop}" title="学籍番号欄（手書きの数字）">` : ''}<input class="ck-in" value="${esc(id)}" inputmode="numeric" maxlength="${s.p.digits}" aria-label="学籍番号" ${s.p.digits ? '' : 'disabled'}>${s.idw ? `<span class="tag kr" title="生徒は ${esc(s.idw)} と書きました。名簿の「もう一つの番号」なので、名簿の番号に直しました">書いた番号 ${esc(s.idw)}</span>` : ''}`;
+  const ckTags = (s, id, pr) =>
+    `<button class="b del ck-del" title="この用紙のデータを削除します（二重に読み取った用紙など。削除した直後は「取り消す」で戻せます）">削除</button>${isKey(s) ? '<span class="tag key">正解用紙</span>' : ''}${krm.has(id) && !isKey(s) ? `<span class="tag kr" title="所属: ${esc(krm.get(id).own || '－')}">交流 ${esc(krm.get(id).kr)}</span>` : ''}${mvm.has(id) && !isKey(s) ? `<span class="tag mv" title="名簿で転出にした生徒">転出</span>` : ''}${CKF.fixed.has(s) ? `<span class="tag fx">直しました（${esc(CKF.fixed.get(s))} → ${esc(id)}）</span>` : ''}${pr.map(x => `<span class="tag ng"${x === '要確認（マーク）' ? ' title="マークの読み取りに確認が必要な問があります。「用紙を開く」で直します"' : ''}>${x}</span>`).join(' ')}</div>`;
+  const ckName = s =>
+    `${s.nameCrop ? `<img class="ck-name${s.p.vert ? ' v' : ''}" src="${s.nameCrop}" alt="氏名欄">` : ''}`;
+  const ckBack = s =>
+    `${s.back ? `<div class="ck-back"><span class="muted">裏面</span>${s.back.idCrop ? `<img class="ck-idimg" src="${s.back.idCrop}" title="裏面の学籍番号欄">` : ''}<b>${esc(idString(s.back) || '?')}</b>${s.back.nameCrop ? `<img class="ck-name${s.p.vert ? ' v' : ''}" src="${s.back.nameCrop}" alt="裏面の氏名欄">` : ''}</div>` : ''}`;
+  const ckBot = (s, id) =>
+    `<div class="ck-bot"><span>${ros.size && !isKey(s) ? (ros.has(id) ? `名簿: <b${CKF.fixed.has(s) ? ' class="ck-fxname"' : ''}>${esc(ros.get(id))}</b>${CKF.fixed.has(s) ? '<span class="ck-fxq">手書きと合っていますか</span>' : ''}` : `名簿: － <button class="b ck-addros" title="転入生など、名簿にない生徒をこの番号で名簿に足します">名簿に足す</button>`) : ''}</span><span>${isKey(s) ? '' : `<select class="ck-ex${s.ex ? '' : ' n'}" title="別室・追試・集計から外す を選べます（「6. 採点結果・出力」の集計に使います）">${['', ...EXS].map(v => `<option value="${v}"${v === (s.ex || '') ? ' selected' : ''}>${v ? EXL[v] : '別室・追試…'}</option>`).join('')}</select> `}<button class="b ck-open">用紙を開く</button></span></div></div>`;
+  const ckCard = ({ s, i, id, pr }) =>
+    `<div class="ck-card${pr.length ? ' ng' : CKF.fixed.has(s) ? ' fx' : ''}${s.p.vert ? ' v' : ''}" data-i="${i}">\n    ` +
+    [ckTop(s, id), ckTags(s, id, pr), ckName(s), ckBack(s), ckBot(s, id)].join('\n    ');
   const only = $('#ck-only').checked;
   g.innerHTML =
     list
       .filter(x => !only || x.pr.length || CKF.fixed.has(x.s))
-      .map(
-        ({
-          s,
-          i,
-          id,
-          pr
-        }) => `<div class="ck-card${pr.length ? ' ng' : CKF.fixed.has(s) ? ' fx' : ''}${s.p.vert ? ' v' : ''}" data-i="${i}">
-    <div class="ck-top">${s.idCrop ? `<img class="ck-idimg" src="${s.idCrop}" title="学籍番号欄（手書きの数字）">` : ''}<input class="ck-in" value="${esc(id)}" inputmode="numeric" maxlength="${s.p.digits}" aria-label="学籍番号" ${s.p.digits ? '' : 'disabled'}>${s.idw ? `<span class="tag kr" title="生徒は ${esc(s.idw)} と書きました。名簿の「もう一つの番号」なので、名簿の番号に直しました">書いた番号 ${esc(s.idw)}</span>` : ''}
-    <button class="b del ck-del" title="この用紙のデータを削除します（二重に読み取った用紙など。削除した直後は「取り消す」で戻せます）">削除</button>${isKey(s) ? '<span class="tag key">正解用紙</span>' : ''}${krm.has(id) && !isKey(s) ? `<span class="tag kr" title="所属: ${esc(krm.get(id).own || '－')}">交流 ${esc(krm.get(id).kr)}</span>` : ''}${mvm.has(id) && !isKey(s) ? `<span class="tag mv" title="名簿で転出にした生徒">転出</span>` : ''}${CKF.fixed.has(s) ? `<span class="tag fx">直しました（${esc(CKF.fixed.get(s))} → ${esc(id)}）</span>` : ''}${pr.map(x => `<span class="tag ng"${x === '要確認（マーク）' ? ' title="マークの読み取りに確認が必要な問があります。「用紙を開く」で直します"' : ''}>${x}</span>`).join(' ')}</div>
-    ${s.nameCrop ? `<img class="ck-name${s.p.vert ? ' v' : ''}" src="${s.nameCrop}" alt="氏名欄">` : ''}
-    ${s.back ? `<div class="ck-back"><span class="muted">裏面</span>${s.back.idCrop ? `<img class="ck-idimg" src="${s.back.idCrop}" title="裏面の学籍番号欄">` : ''}<b>${esc(idString(s.back) || '?')}</b>${s.back.nameCrop ? `<img class="ck-name${s.p.vert ? ' v' : ''}" src="${s.back.nameCrop}" alt="裏面の氏名欄">` : ''}</div>` : ''}
-    <div class="ck-bot"><span>${ros.size && !isKey(s) ? (ros.has(id) ? `名簿: <b${CKF.fixed.has(s) ? ' class="ck-fxname"' : ''}>${esc(ros.get(id))}</b>${CKF.fixed.has(s) ? '<span class="ck-fxq">手書きと合っていますか</span>' : ''}` : `名簿: － <button class="b ck-addros" title="転入生など、名簿にない生徒をこの番号で名簿に足します">名簿に足す</button>`) : ''}</span><span>${isKey(s) ? '' : `<select class="ck-ex${s.ex ? '' : ' n'}" title="別室・追試・集計から外す を選べます（「6. 採点結果・出力」の集計に使います）">${['', ...EXS].map(v => `<option value="${v}"${v === (s.ex || '') ? ' selected' : ''}>${v ? EXL[v] : '別室・追試…'}</option>`).join('')}</select> `}<button class="b ck-open">用紙を開く</button></span></div></div>`
-      )
+      .map(ckCard)
       .join('') || '<p class="muted">表示する用紙はありません。</p>';
   updateAlerts();
   drawRosGate();

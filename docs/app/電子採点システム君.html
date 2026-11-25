@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- 外部との通信をブラウザの仕組みで禁止する（画像・データはこのファイルの中だけで扱う） -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-E1DP0mOtpRXEi/wa+5YqBNkIS185tlz9FJoM8SGiI30='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-PvOiI5hwfY8p/I+CT5ZrXuVJUQZREPs2u2eJxgRdum0='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
 <title>電子採点システム君</title>
 <style>
 :root {
@@ -7405,9 +7405,19 @@ function $(s) {
 }
 document.querySelectorAll('header > button').forEach(b => (b.onclick = () => showTab(b.dataset.tab)));
 // --- 版（バージョン）と更新履歴。番号は 年.月.日.その日の何回目か（10/06 以前は1日分をまとめて1つ）
-const APP_VER = '2026.11.24.4',
-  APP_DATE = '2026年11月24日';
+const APP_VER = '2026.11.25.1',
+  APP_DATE = '2026年11月25日';
 const HISTORY = [
+  [
+    '2026.11.25.1',
+    '11月25日',
+    [
+      '返却用の答案で、表裏のある答案の裏のページが作れなかった生徒は「出した」に入れず、次も「まだ出していない生徒」に出るようにしました。',
+      '返却用の答案で、まだ一度も出していないテストに切り替えると「選んだ生徒だけ」のまま0人になり、出せなかったのを直しました。テストを切り替えると「全員」に戻ります。',
+      '全員分を出したあとは、「まだ出していない生徒を選ぶ」ボタンを出さないようにしました。',
+      '「選んだ生徒だけ」で未採点の人を除いて作ったとき、知らせに「選んだ3人のうち2人だけ」のように出した人数も書くようにしました。'
+    ]
+  ],
   [
     '2026.11.24.4',
     '11月24日',
@@ -18488,13 +18498,14 @@ function ovWhoLoad() {
       : '（全員分を出してあります）'
     : '';
   // 前に出した答案と、まだ出していない答案がまざったら（あとから読み取ったら）、まだの生徒を選んでおく
+  // それ以外（全員出した・まだ一度も出していないテストに切り替えた）は「全員」に戻す。前のテストの選びが残って0人で止まらないように
   if (sig !== ovWhoSig) {
     ovWhoSig = sig;
+    ovPicked.clear();
     if (nr && nr.length) {
-      ovPicked.clear();
       nr.forEach(r => ovPicked.add(ovKey(r)));
       $('#ov-who-pick').checked = true;
-    } else if (nr) $('#ov-who-all').checked = true;
+    } else $('#ov-who-all').checked = true;
   }
   const keys = new Set(rows.map(ovKey));
   [...ovPicked].forEach(k => keys.has(k) || ovPicked.delete(k));
@@ -18514,7 +18525,8 @@ function ovWhoLoad() {
 function ovPickShow() {
   const on = !$('#ov-who').hidden && radioVal('ov-who') === 'pick';
   $('#ov-pick').hidden = !on;
-  $('#ov-pick-new').hidden = !ovNewRows(S.scored);
+  const nr = ovNewRows(S.scored);
+  $('#ov-pick-new').hidden = !(nr && nr.length);
   $('#ov-pick-n').textContent = `${ovPicked.size}人を選んでいます`;
 }
 $('#ov-who').addEventListener('change', ovPickShow);
@@ -19169,7 +19181,10 @@ async function ovMake(zip) {
       made = jobs.filter(j => pages.has(j)).length;
     if (!made) throw new Error('出力できる答案がありません');
     const t = curTest(),
-      base = safeName(t ? t.name : 'テスト');
+      base = safeName(t ? t.name : 'テスト'),
+      nOut = groups.reduce((a, g) => a + g.rows.length, 0),
+      // 「未採点の人を除いて作る」で減ったときは、選んだ人数と出した人数の両方を書く
+      pickLab = !nr ? '' : nOut < nr.length ? `選んだ${nr.length}人のうち${nOut}人だけ` : `選んだ${nr.length}人だけ`;
     let name, what;
     if (zip) {
       const files = [],
@@ -19184,7 +19199,7 @@ async function ovMake(zip) {
         }
       name = `返却用_${base}.zip`;
       downloadBlob(zipStore(files, 'application/zip'), name); // 答案は圧縮ずみなので、無圧縮の ZIP
-      what = `${files.length}人分のPDF${nr ? `・選んだ${nr.length}人だけ` : ''}`;
+      what = `${files.length}人分のPDF${pickLab ? '・' + pickLab : ''}`;
     } else {
       const list = [];
       let nc = 0;
@@ -19198,9 +19213,10 @@ async function ovMake(zip) {
       }
       name = `採点済み答案_${base}.pdf`;
       downloadBlob(buildPdf(list), name);
-      what = `${list.length} ページ・${nr ? `選んだ${nr.length}人だけ・` : ''}${o.ord === 'cls' ? `学級→出席番号の順、表紙 ${nc}枚` : '学籍番号順'}${jobs.some(j => j.s !== j.r.s) ? '・表裏の順' : ''}`;
+      what = `${list.length} ページ・${pickLab ? pickLab + '・' : ''}${o.ord === 'cls' ? `学級→出席番号の順、表紙 ${nc}枚` : '学籍番号順'}${jobs.some(j => j.s !== j.r.s) ? '・表裏の順' : ''}`;
     }
-    const doneRows = groups.flatMap(g => g.rows).filter(r => jobs.some(j => j.r === r && pages.has(j)));
+    // 表も裏も作れた答案だけを「出した」とする。1ページでも作れなかった生徒は、次も「まだ出していない」に入る
+    const doneRows = groups.flatMap(g => g.rows).filter(r => jobs.every(j => j.r !== r || pages.has(j)));
     ovMarkDone(doneRows);
     ovWhoLoad();
     msg.textContent =

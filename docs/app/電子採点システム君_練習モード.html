@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- 外部との通信をブラウザの仕組みで禁止する（画像・データはこのファイルの中だけで扱う） -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-u9D0QZImHDdjInEllFY0/dxdx2tQD5Aw2HmHLU4DDKY=' 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-FMTknqFMwf+vAIiXkEHuJeh2MLodqEZ5Yi88QJ5l2yk=' 'sha256-MA3y2oFyWswFJjZAMxiHN3vVK6uXWif0S6jKN0xDBHE='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-u9D0QZImHDdjInEllFY0/dxdx2tQD5Aw2HmHLU4DDKY=' 'sha256-jeQYgzTtgAv9MGyZSl4XEdrdaeTeulgY0WRHUpi9Vrw=' 'sha256-+SF1C8SFU9EVyeoCWgENErbXFolGd0vamum00gdihtg=' 'sha256-JOjjSEfuX4FCrrrMwWIi3rBnhVGqa+Rg8KQnpb9tQG4=' 'sha256-MA3y2oFyWswFJjZAMxiHN3vVK6uXWif0S6jKN0xDBHE='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
 <title>電子採点システム君</title>
 <style>
 :root {
@@ -4764,6 +4764,9 @@ const ORIENT = { x: 28, y: 12, size: 4 };
 const BITS = { x0: 30, step: 6, size: 3.2, perRow: 17, n: 34, dy: [14.3, 9.7] }; // 下端からの距離
 const TIMING = { w: 5, h: 1.4 };
 const BUB = { rx: 2.4, ry: 1.6 };
+// 塗る欄の中に印刷する番号・文字の色。塗りと紛れないよう灰色にする（2026-11-27 まで #555）。
+// 読み取りは文字の所を答案から求めて外すので、前の濃い番号の用紙もそのまま読める
+const BUB_LABEL = '#999';
 
 // 既定値で埋めた用紙設定
 // wq: マーク欄なし（n=0）・2〜4列の記述欄を、左の列の上から下へ番号を進める並べ方（一問一答。2026-10-08）。2〜3列は30問、4列は50問まで（入らなければ欄の高さを10mmまで縮める）。以前の n=0 の用紙（横に進む）は wq=0 のまま
@@ -5681,7 +5684,7 @@ function bubbles(q, r, k0, F, key, cell) {
         `<rect class="kv-hit" data-q="${q.num - 1}" data-k="${k}" x="${(b.x - hw).toFixed(2)}" y="${(b.y - hh).toFixed(2)}" width="${(hw * 2).toFixed(2)}" height="${(hh * 2).toFixed(2)}" fill="transparent"/>`
       );
     o.push(
-      `<ellipse ${key ? `data-q="${q.num - 1}" data-k="${k}" ` : ''}cx="${b.x}" cy="${b.y}" rx="${BUB.rx}" ry="${BUB.ry}" fill="${on ? '#1f6feb' : key ? '#fff' : 'none'}" stroke="#000" stroke-width="0.25"/><text x="${b.x}" y="${(b.y + 0.8).toFixed(2)}" font-size="${lab[k].length > 1 ? 1.8 : 2.2}" text-anchor="middle" fill="${on ? '#fff' : '#555'}" pointer-events="none" ${F}>${lab[k]}</text>`
+      `<ellipse ${key ? `data-q="${q.num - 1}" data-k="${k}" ` : ''}cx="${b.x}" cy="${b.y}" rx="${BUB.rx}" ry="${BUB.ry}" fill="${on ? '#1f6feb' : key ? '#fff' : 'none'}" stroke="#000" stroke-width="0.25"/><text x="${b.x}" y="${(b.y + 0.8).toFixed(2)}" font-size="${lab[k].length > 1 ? 1.8 : 2.2}" text-anchor="middle" fill="${on ? '#fff' : BUB_LABEL}" pointer-events="none" ${F}>${lab[k]}</text>`
     );
   });
   return o;
@@ -5826,7 +5829,7 @@ function sheetSVG(L, title, labels, rows, wst) {
         o.push(`<line x1="${x0 + d * 6}" x2="${x0 + d * 6}" y1="34.5" y2="76.5" stroke="#aaa" stroke-width="0.15"/>`);
       L.id[d].forEach((b, v) => {
         o.push(
-          `<ellipse cx="${b.x}" cy="${b.y}" rx="${BUB.rx}" ry="${BUB.ry}" fill="none" stroke="#000" stroke-width="0.25"/><text x="${b.x}" y="${(b.y + 0.8).toFixed(2)}" font-size="2.2" text-anchor="middle" fill="#555" ${F}>${v}</text>`
+          `<ellipse cx="${b.x}" cy="${b.y}" rx="${BUB.rx}" ry="${BUB.ry}" fill="none" stroke="#000" stroke-width="0.25"/><text x="${b.x}" y="${(b.y + 0.8).toFixed(2)}" font-size="2.2" text-anchor="middle" fill="${BUB_LABEL}" ${F}>${v}</text>`
         );
       });
     }
@@ -7418,9 +7421,17 @@ function $(s) {
 }
 document.querySelectorAll('header > button').forEach(b => (b.onclick = () => showTab(b.dataset.tab)));
 // --- 版（バージョン）と更新履歴。番号は 年.月.日.その日の何回目か（10/06 以前は1日分をまとめて1つ）
-const APP_VER = '2026.11.25.2',
-  APP_DATE = '2026年11月25日';
+const APP_VER = '2026.11.27.1',
+  APP_DATE = '2026年11月27日';
 const HISTORY = [
+  [
+    '2026.11.27.1',
+    '11月27日',
+    [
+      '解答用紙の塗る欄の中の番号・文字を、うすい灰色で印刷するようにしました。生徒は読めて、塗りとまちがえにくくなります。前の濃い番号の用紙も、これまでどおり読み取れます。',
+      '「このアプリについて」のデータの行に、データの区分（B）を書きました。'
+    ]
+  ],
   [
     '2026.11.25.2',
     '11月25日',
@@ -8376,7 +8387,7 @@ const ABOUT = {
   url: 'https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ja',
   // ネットでだれでも使えるよう配るときの注意（2026-11-21）
   target: '学校の先生（おもに中学校）。Windows のパソコンの Edge か Chrome で使います。',
-  data: '名簿・答案・点数は、このパソコンのブラウザの中だけに保存します。インターネットには送りません。',
+  data: '名簿・答案・点数は、このパソコンのブラウザの中だけに保存します。インターネットには送りません。データの区分は B（ギジュツドットコム「教育用アプリの公開・授業利用ガイドライン」の区分）です。生成AIは使っていません。',
   note: '学校で使うときは、先に管理職・情報担当の先生に確かめてください。読み取り・採点の結果や観点別の評価は、先生が確かめて決めてください。このアプリは無保証です。使って起きた損害について、作成者は責任を負いません。',
   contact: 'https://docs.google.com/forms/d/e/1FAIpQLSd4Tc_djY4iIpP_REZZZALOAZJHVkDxrj0N8EwSRyjtVbxeGw/viewform',
   home: 'https://okarin-netizen.github.io/denshi-saiten/'
